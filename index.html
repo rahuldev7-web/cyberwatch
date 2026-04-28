@@ -153,8 +153,9 @@ nav{
 .map-wrap{flex:1;position:relative;overflow:hidden;cursor:crosshair;}
 #mapCanvas{position:absolute;inset:0;z-index:2;pointer-events:none;}
 #map-svg{position:absolute;inset:0;z-index:1;}
-#map-svg path{fill:#071628;stroke:#0d2540;stroke-width:0.4;cursor:pointer;transition:fill 0.2s;}
-#map-svg path:hover{fill:#0e2d4a;}
+#map-svg path{fill:#0d2240;stroke:#1a4060;stroke-width:0.5;cursor:pointer;transition:fill 0.2s;}
+#map-svg path:hover{fill:#0e3560;}
+#map-svg path.sphere{fill:#0a1628;}
 #map-svg path.highlighted{fill:#0d3520;}
 .map-vignette{
   position:absolute;inset:0;z-index:3;pointer-events:none;
@@ -442,16 +443,37 @@ function resize(){
 
 function drawMap(){
   svg.selectAll('*').remove();
-  svg.append('g').selectAll('path')
-    .data(topojson.feature(window._world,window._world.objects.countries).features)
-    .join('path').attr('d',path)
-    .on('click',function(event,d){showCountryInfo(event,d);});
+
+  // Ocean sphere
+  svg.append('path')
+    .datum({type:'Sphere'})
+    .attr('d', path)
+    .attr('fill','#0a1628')
+    .attr('stroke','rgba(0,180,255,0.15)')
+    .attr('stroke-width',0.8);
 
   // Graticule
   const grat=d3.geoGraticule()();
   svg.append('path').datum(grat)
     .attr('d',path).attr('fill','none')
-    .attr('stroke','rgba(0,255,150,0.04)').attr('stroke-width',0.5);
+    .attr('stroke','rgba(0,255,150,0.06)').attr('stroke-width',0.4);
+
+  // Countries
+  svg.append('g').selectAll('path')
+    .data(topojson.feature(window._world,window._world.objects.countries).features)
+    .join('path').attr('d',path)
+    .attr('fill','#0d2240')
+    .attr('stroke','#1a4060')
+    .attr('stroke-width',0.5)
+    .on('click',function(event,d){showCountryInfo(event,d);});
+
+  // Country borders only
+  svg.append('path')
+    .datum(topojson.mesh(window._world, window._world.objects.countries, (a,b)=>a!==b))
+    .attr('d',path)
+    .attr('fill','none')
+    .attr('stroke','rgba(0,180,255,0.2)')
+    .attr('stroke-width',0.4);
 }
 
 window.addEventListener('resize',resize);
