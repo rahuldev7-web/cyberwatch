@@ -135,8 +135,9 @@ nav{
 
 /* ── MINI STATS BAR ── */
 .mini-stats{
-  position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:50;
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);z-index:50;
   display:flex;gap:2px;
+  pointer-events:none;
 }
 .ms{
   background:rgba(3,7,13,0.92);
@@ -227,6 +228,15 @@ nav{
 
 /* Credit */
 .credit{position:absolute;bottom:52px;left:16px;font-size:0.58rem;color:rgba(255,255,255,0.12);z-index:10;}
+.map-legend{
+  position:absolute;bottom:80px;left:16px;z-index:50;
+  background:rgba(3,7,13,0.88);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:10px 14px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:0.68rem;color:rgba(255,255,255,0.45);}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .credit a{color:rgba(0,255,150,0.3);text-decoration:none;}
 .credit a:hover{color:rgba(0,255,150,0.6);}
 
@@ -289,10 +299,44 @@ nav{
 </nav>
 
 <div class="main">
+  <!-- MOBILE FALLBACK -->
+  <div class="mobile-fallback">
+    <div style="font-size:3rem">🌐</div>
+    <h2>CyberWatch</h2>
+    <p>This dashboard is optimized for desktop. Visit on a larger screen for the full experience.</p>
+    <a href="https://rahuldev7-web.github.io/passguard">Try PassGuard instead →</a>
+    <p style="font-size:0.75rem;margin-top:8px;">Built by <a href="https://rahuldev7-web.github.io">Kiran Rahul Pabboju</a> · M.S. Cybersecurity</p>
+  </div>
+
   <div class="map-wrap" id="mapWrap">
     <svg id="map-svg"></svg>
     <canvas id="mapCanvas"></canvas>
     <div class="map-vignette"></div>
+    <div class="intro-overlay" id="introOverlay">
+      <div class="intro-title">Live Global Threat Intelligence</div>
+      <div class="intro-hint">
+        <div class="hint-item">🖱️ Scroll to zoom</div>
+        <div class="hint-item">✋ Drag to pan</div>
+        <div class="hint-item">🔍 Search countries</div>
+        <div class="hint-item">🖱️ Click country for details</div>
+      </div>
+    </div>
+    <div class="map-tooltip" id="mapTooltip">
+      <div class="tt-name" id="tt-name">—</div>
+      <div class="tt-stat"><span>Attacks</span><span class="tt-val" id="tt-attacks">—</span></div>
+      <div class="tt-stat"><span>Top type</span><span class="tt-val" id="tt-type">—</span></div>
+      <div class="tt-stat"><span>Status</span><span class="tt-val" id="tt-status" style="color:#ff2d4a">ACTIVE</span></div>
+    </div>
+    <div class="map-search" id="mapSearch">
+      <input type="text" id="searchInput" placeholder="Search country...">
+      <div class="search-results" id="searchResults"></div>
+      <button class="map-search-btn" id="searchBtn">🔍</button>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoomIn">+</button>
+      <button class="zoom-btn" id="zoomReset">⊙</button>
+      <button class="zoom-btn" id="zoomOut">−</button>
+    </div>
 
     <!-- Severity Gauge -->
     <div class="gauge-wrap">
@@ -303,15 +347,14 @@ nav{
     </div>
 
     <!-- Mini Stats -->
-    <div class="mini-stats" id="miniStats">
-      <div class="ms"><div class="ms-v ddos" id="ms-ddos">0</div><div class="ms-l">DDoS</div></div>
-      <div class="ms"><div class="ms-v brute" id="ms-brute">0</div><div class="ms-l">Brute</div></div>
-      <div class="ms"><div class="ms-v ransom" id="ms-ransom">0</div><div class="ms-l">Ransom</div></div>
-      <div class="ms"><div class="ms-v phish" id="ms-phish">0</div><div class="ms-l">Phish</div></div>
-      <div class="ms"><div class="ms-v scan" id="ms-scan">0</div><div class="ms-l">Scan</div></div>
-    </div>
+
 
     <div class="credit">Built by <a href="https://rahuldev7-web.github.io" target="_blank">Kiran Rahul Pabboju</a> · M.S. Cybersecurity · <a href="https://rahuldev7-web.github.io/passguard" target="_blank">PassGuard</a></div>
+    <div class="map-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#ff2d4a;box-shadow:0 0 6px #ff2d4a"></div><span>Attack Source</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00ff96;box-shadow:0 0 6px #00ff96"></div><span>Target Country</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1e4060"></div><span>Neutral</span></div>
+    </div>
   </div>
 
   <div class="sidebar">
@@ -441,39 +484,205 @@ function resize(){
   if(window._world) drawMap();
 }
 
+// Zoom behavior
+let zoom = d3.zoom()
+  .scaleExtent([0.8, 8])
+  .on('zoom', zoomed);
+
+function zoomed(event){
+  mapG.attr('transform', event.transform);
+}
+
+let mapG;
+
 function drawMap(){
   svg.selectAll('*').remove();
 
-  // Ocean sphere
-  svg.append('path')
+  // Ocean gradient
+  const defs = svg.append('defs');
+  const oceanGrad = defs.append('radialGradient')
+    .attr('id','oceanGrad')
+    .attr('cx','50%').attr('cy','45%').attr('r','55%');
+  oceanGrad.append('stop').attr('offset','0%').attr('stop-color','#0e2a4a');
+  oceanGrad.append('stop').attr('offset','60%').attr('stop-color','#081c36');
+  oceanGrad.append('stop').attr('offset','100%').attr('stop-color','#04101e');
+
+  // Apply zoom
+  svg.call(zoom);
+
+  mapG = svg.append('g');
+
+  // Sphere (ocean)
+  mapG.append('path')
     .datum({type:'Sphere'})
+    .attr('class','sphere')
     .attr('d', path)
-    .attr('fill','#0a1628')
-    .attr('stroke','rgba(0,180,255,0.15)')
+    .attr('stroke','rgba(0,150,220,0.2)')
     .attr('stroke-width',0.8);
 
   // Graticule
-  const grat=d3.geoGraticule()();
-  svg.append('path').datum(grat)
-    .attr('d',path).attr('fill','none')
-    .attr('stroke','rgba(0,255,150,0.06)').attr('stroke-width',0.4);
+  const grat = d3.geoGraticule()();
+  mapG.append('path').datum(grat)
+    .attr('class','graticule')
+    .attr('d',path);
 
   // Countries
-  svg.append('g').selectAll('path')
-    .data(topojson.feature(window._world,window._world.objects.countries).features)
-    .join('path').attr('d',path)
-    .attr('fill','#0d2240')
-    .attr('stroke','#1a4060')
-    .attr('stroke-width',0.5)
-    .on('click',function(event,d){showCountryInfo(event,d);});
+  const features = topojson.feature(window._world, window._world.objects.countries).features;
+  mapG.append('g').attr('class','countries')
+    .selectAll('path')
+    .data(features)
+    .join('path')
+    .attr('class','country')
+    .attr('d', path)
+    .attr('fill', d => {
+      const name = d.properties?.name||'';
+      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
+      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
+      if(isSource && isTarget) return '#1a2a3a';
+      if(isSource) return '#1a1828';
+      if(isTarget) return '#0e2218';
+      return '#112038';
+    })
+    .attr('stroke', d => {
+      const name = d.properties?.name||'';
+      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
+      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
+      if(isSource && isTarget) return '#ff6b2b';
+      if(isSource) return '#ff2d4a';
+      if(isTarget) return '#00ff96';
+      return '#1e4060';
+    })
+    .attr('stroke-width', d => {
+      const name = d.properties?.name||'';
+      const isKey = [...COUNTRIES.slice(0,12), ...TARGETS.slice(0,8)].some(x=>x.name===name);
+      return isKey ? 1.2 : 0.4;
+    })
+    .on('mouseover', function(event, d){
+      const name = d.properties?.name||'';
+      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
+      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
+      if(isSource) d3.select(this).attr('fill','#2a1828').attr('stroke','#ff4d6d');
+      else if(isTarget) d3.select(this).attr('fill','#0d2e18').attr('stroke','#06ffa5');
+      else d3.select(this).attr('fill','#1a3050').attr('stroke','#3a70a0');
+      showTooltip(event, d);
+    })
+    .on('mousemove', moveTooltip)
+    .on('mouseout', function(event, d){
+      const name = d.properties?.name||'';
+      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
+      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
+      if(isSource && isTarget){ d3.select(this).attr('fill','#1a2a3a').attr('stroke','#ff6b2b'); }
+      else if(isSource){ d3.select(this).attr('fill','#1a1828').attr('stroke','#ff2d4a'); }
+      else if(isTarget){ d3.select(this).attr('fill','#0e2218').attr('stroke','#00ff96'); }
+      else{ d3.select(this).attr('fill','#112038').attr('stroke','#1e4060'); }
+      hideTooltip();
+    })
+    .on('click', function(event, d){ zoomToCountry(d); });
 
-  // Country borders only
-  svg.append('path')
+  // Borders mesh
+  mapG.append('path')
     .datum(topojson.mesh(window._world, window._world.objects.countries, (a,b)=>a!==b))
-    .attr('d',path)
-    .attr('fill','none')
-    .attr('stroke','rgba(0,180,255,0.2)')
-    .attr('stroke-width',0.4);
+    .attr('class','borders')
+    .attr('d', path);
+
+  // Country names (zoom level > 2)
+  setupSearch(features);
+}
+
+// Tooltip
+function showTooltip(event, d){
+  const tt = document.getElementById('mapTooltip');
+  const name = d.properties?.name || 'Unknown';
+  const c = COUNTRIES.find(x=>x.name===name);
+  document.getElementById('tt-name').innerHTML = (c?.flag||'🌐')+' '+name;
+  document.getElementById('tt-attacks').textContent = fmt(sourceCounts[name]||Math.floor(Math.random()*50000));
+  document.getElementById('tt-type').textContent = c?.topType || 'DDoS';
+  tt.style.display='block';
+  moveTooltip(event);
+}
+function moveTooltip(event){
+  const tt = document.getElementById('mapTooltip');
+  const wrap = document.getElementById('mapWrap');
+  const rect = wrap.getBoundingClientRect();
+  let x = event.clientX - rect.left + 14;
+  let y = event.clientY - rect.top - 10;
+  if(x + 180 > rect.width) x -= 200;
+  tt.style.left = x+'px';
+  tt.style.top = y+'px';
+}
+function hideTooltip(){
+  document.getElementById('mapTooltip').style.display='none';
+}
+
+// Zoom to country
+function zoomToCountry(d){
+  const [[x0,y0],[x1,y1]] = path.bounds(d);
+  const cx = (x0+x1)/2, cy = (y0+y1)/2;
+  const scale = Math.min(8, 0.9/Math.max((x1-x0)/W,(y1-y0)/H));
+  svg.transition().duration(750).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(W/2,H/2).scale(scale).translate(-cx,-cy)
+  );
+  // Show country panel
+  const name = d.properties?.name || '';
+  showCountryByName(name);
+}
+
+// Zoom buttons
+document.getElementById('zoomIn').addEventListener('click',()=>{
+  svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+});
+document.getElementById('zoomOut').addEventListener('click',()=>{
+  svg.transition().duration(300).call(zoom.scaleBy, 0.67);
+});
+document.getElementById('zoomReset').addEventListener('click',()=>{
+  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+});
+
+// Search
+function setupSearch(features){
+  const input = document.getElementById('searchInput');
+  const results = document.getElementById('searchResults');
+
+  input.addEventListener('input', ()=>{
+    const q = input.value.toLowerCase().trim();
+    if(!q){ results.style.display='none'; return; }
+    const matches = features
+      .filter(f=>(f.properties?.name||'').toLowerCase().includes(q))
+      .slice(0,6);
+    if(!matches.length){ results.style.display='none'; return; }
+    results.style.display='block';
+    results.innerHTML = matches.map(f=>{
+      const name = f.properties?.name||'';
+      const c = COUNTRIES.find(x=>x.name===name);
+      return `<div class="sr-item" onclick="selectCountry('${name.replace(/'/g,"\'")}')">
+        <span>${c?.flag||'🌐'}</span>
+        <span>${name}</span>
+        <span style="margin-left:auto;font-size:0.65rem;color:var(--muted)">${fmt(sourceCounts[name]||0)} attacks</span>
+      </div>`;
+    }).join('');
+  });
+
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){ results.style.display='none'; input.value=''; }
+  });
+
+  document.addEventListener('click', e=>{
+    if(!document.getElementById('mapSearch').contains(e.target)){
+      results.style.display='none';
+    }
+  });
+}
+
+function selectCountry(name){
+  document.getElementById('searchInput').value = name;
+  document.getElementById('searchResults').style.display='none';
+  // Find feature and zoom
+  if(!window._world) return;
+  const features = topojson.feature(window._world, window._world.objects.countries).features;
+  const f = features.find(x=>(x.properties?.name||'')===name);
+  if(f) zoomToCountry(f);
+  showCountryByName(name);
 }
 
 window.addEventListener('resize',resize);
