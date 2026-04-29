@@ -4,292 +4,265 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CyberWatch — Live Global Threat Intelligence</title>
-<meta name="description" content="Real-time global cyber attack visualization. SOC Dashboard. Built by Kiran Rahul Pabboju.">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --bg:#03070d;
-  --surface:rgba(255,255,255,0.03);
-  --border:rgba(0,255,150,0.1);
-  --text:#c8d8e8;
-  --muted:rgba(180,210,230,0.35);
-  --green:#00ff96;
-  --red:#ff2d4a;
-  --orange:#ff6b2b;
-  --yellow:#ffd60a;
-  --blue:#00b8ff;
-  --purple:#8b5cf6;
-  --cyan:#00e5ff;
+  --bg:#03070d;--surface:rgba(255,255,255,0.03);--border:rgba(255,255,255,0.07);
+  --text:#c8d8e8;--muted:rgba(180,210,230,0.4);
+  --red:#ff2d4a;--green:#00ff96;--orange:#ff8c42;--yellow:#ffd60a;--blue:#00b8ff;--purple:#8b5cf6;
 }
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);}
 body{font-family:'Inter',sans-serif;color:var(--text);display:flex;flex-direction:column;}
 
 /* ── SCANLINES ── */
-body::after{
-  content:'';
-  position:fixed;inset:0;z-index:9999;
-  pointer-events:none;
-  background:repeating-linear-gradient(
-    0deg,
-    transparent,transparent 2px,
-    rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px
-  );
-}
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);}
 
-/* ── CRITICAL ALERT ── */
-.alert-overlay{
-  position:fixed;inset:0;z-index:1000;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(255,45,74,0.08);
-  backdrop-filter:blur(2px);
-  opacity:0;pointer-events:none;
-  transition:opacity 0.3s;
-}
-.alert-overlay.show{opacity:1;pointer-events:all;}
-.alert-box{
-  background:#03070d;
-  border:2px solid var(--red);
-  border-radius:12px;
-  padding:32px 40px;
-  text-align:center;
-  max-width:480px;
-  box-shadow:0 0 60px rgba(255,45,74,0.3),0 0 120px rgba(255,45,74,0.1);
-  animation:alertPulse 0.5s ease infinite alternate;
-}
-@keyframes alertPulse{from{box-shadow:0 0 40px rgba(255,45,74,0.3);}to{box-shadow:0 0 80px rgba(255,45,74,0.5);}}
-.alert-header{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;}
-.alert-icon{font-size:28px;animation:spin 2s linear infinite;}
-@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-.alert-title{font-size:1.3rem;font-weight:900;color:var(--red);letter-spacing:0.05em;}
-.alert-type{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;color:#fff;margin-bottom:8px;}
-.alert-route{font-size:0.88rem;color:var(--muted);margin-bottom:20px;}
-.alert-close{
-  background:var(--red);color:#fff;
-  border:none;padding:10px 28px;border-radius:8px;
-  font-size:0.82rem;font-weight:700;cursor:pointer;
-  letter-spacing:0.05em;text-transform:uppercase;
-}
-.alert-close:hover{background:#cc2038;}
+/* ── ALERT ── */
+.alert{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,45,74,0.06);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.alert.show{opacity:1;pointer-events:all;}
+.alert-box{background:#03070d;border:1.5px solid var(--red);border-radius:14px;padding:32px 40px;text-align:center;
+  max-width:460px;box-shadow:0 0 80px rgba(255,45,74,0.25);animation:alertGlow 0.8s ease infinite alternate;}
+@keyframes alertGlow{from{box-shadow:0 0 40px rgba(255,45,74,0.2);}to{box-shadow:0 0 80px rgba(255,45,74,0.45);}}
+.alert-icon{font-size:2.5rem;margin-bottom:12px;animation:spin 2s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.alert-title{font-size:1.2rem;font-weight:900;color:var(--red);letter-spacing:0.05em;margin-bottom:10px;}
+.alert-type{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;color:#fff;margin-bottom:6px;}
+.alert-route{font-size:0.85rem;color:var(--muted);margin-bottom:20px;}
+.alert-close{background:var(--red);color:#fff;border:none;padding:10px 28px;border-radius:8px;
+  font-size:0.82rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;text-transform:uppercase;}
 
-/* ── COUNTRY DETAIL ── */
-.country-panel{
-  position:fixed;right:290px;top:70px;z-index:500;
-  background:rgba(3,7,13,0.97);
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:20px;
-  width:240px;
-  box-shadow:0 20px 60px rgba(0,0,0,0.6);
-  display:none;
-}
-.country-panel.show{display:block;}
-.cp-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
-.cp-flag{font-size:24px;}
-.cp-name{font-size:1rem;font-weight:700;color:#fff;}
-.cp-close{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;}
-.cp-stat{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-.cp-lbl{font-size:0.75rem;color:var(--muted);}
-.cp-val{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:700;color:var(--green);}
+/* ── COUNTRY POPUP ── */
+.cpop{position:fixed;z-index:1000;background:rgba(3,7,13,0.97);border:1px solid rgba(0,255,150,0.25);
+  border-radius:14px;padding:20px;width:260px;pointer-events:all;display:none;
+  box-shadow:0 20px 60px rgba(0,0,0,0.7),0 0 30px rgba(0,255,150,0.05);}
+.cpop.show{display:block;animation:popIn 0.25s ease;}
+@keyframes popIn{from{opacity:0;transform:scale(0.92)translateY(8px);}to{opacity:1;transform:scale(1)translateY(0);}}
+.cpop-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;
+  border-bottom:1px solid rgba(255,255,255,0.06);}
+.cpop-flag{font-size:22px;}
+.cpop-name{font-size:1rem;font-weight:700;color:#fff;flex:1;}
+.cpop-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px;}
+.cpop-close:hover{color:#fff;}
+.cpop-badge{font-size:0.6rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  padding:3px 8px;border-radius:4px;white-space:nowrap;}
+.cpop-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.cpop-row:last-child{border-bottom:none;}
+.cpop-lbl{font-size:0.72rem;color:var(--muted);}
+.cpop-val{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:700;color:#fff;}
+.cpop-live{display:flex;align-items:center;gap:5px;margin-top:12px;padding-top:10px;
+  border-top:1px solid rgba(255,255,255,0.06);font-size:0.7rem;color:var(--muted);}
+.cpop-live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:livepulse 1s infinite;flex-shrink:0;}
+.cpop-atk-now{font-family:'JetBrains Mono',monospace;color:var(--green);font-weight:700;margin-left:auto;}
 
 /* ── NAV ── */
-nav{
-  position:relative;z-index:100;
-  height:52px;padding:0 20px;
+nav{position:relative;z-index:100;height:52px;padding:0 20px;
   display:flex;justify-content:space-between;align-items:center;
-  background:rgba(3,7,13,0.98);
-  border-bottom:1px solid rgba(0,255,150,0.12);
-  flex-shrink:0;
-}
-.n-left{display:flex;align-items:center;gap:14px;}
-.n-logo{font-size:0.9rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;letter-spacing:0.02em;}
-.n-logo-icon{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--green),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:13px;}
-.live-badge{display:flex;align-items:center;gap:5px;background:rgba(255,45,74,0.1);border:1px solid rgba(255,45,74,0.3);border-radius:100px;padding:3px 9px;font-size:0.6rem;font-weight:700;letter-spacing:0.1em;color:var(--red);text-transform:uppercase;}
+  background:rgba(3,7,13,0.98);border-bottom:1px solid rgba(0,255,150,0.1);flex-shrink:0;}
+.n-left{display:flex;align-items:center;gap:12px;}
+.n-logo{font-size:0.95rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;}
+.n-icon{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--blue));
+  display:flex;align-items:center;justify-content:center;font-size:14px;
+  box-shadow:0 0 16px rgba(0,255,150,0.3);}
+.live-badge{display:flex;align-items:center;gap:5px;background:rgba(255,45,74,0.1);
+  border:1px solid rgba(255,45,74,0.3);border-radius:100px;padding:3px 9px;
+  font-size:0.6rem;font-weight:700;letter-spacing:0.1em;color:var(--red);text-transform:uppercase;}
 .live-dot{width:5px;height:5px;background:var(--red);border-radius:50%;animation:livepulse 1s infinite;}
 @keyframes livepulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
-.threat-level{display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;font-size:0.62rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;border:1px solid;}
-.n-center{display:flex;align-items:center;gap:20px;}
-.n-stat{text-align:center;}
-.n-stat-v{font-family:'JetBrains Mono',monospace;font-size:0.9rem;font-weight:700;line-height:1;}
-.n-stat-l{font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-top:1px;}
+.threat-badge{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:4px;
+  font-size:0.62rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1px solid;}
+.n-center{display:flex;align-items:center;gap:24px;}
+.nstat{text-align:center;}
+.nstat-v{font-family:'JetBrains Mono',monospace;font-size:0.9rem;font-weight:700;line-height:1;}
+.nstat-l{font-size:0.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-top:1px;}
 .n-right{display:flex;align-items:center;gap:14px;}
 .n-link{font-size:0.72rem;color:var(--muted);text-decoration:none;font-weight:500;transition:color 0.2s;}
 .n-link:hover{color:#fff;}
-.n-btn{background:linear-gradient(135deg,var(--green),var(--cyan));color:#03070d;font-size:0.7rem;font-weight:800;padding:5px 14px;border-radius:6px;text-decoration:none;letter-spacing:0.03em;}
-
-/* ── SEVERITY GAUGE ── */
-.gauge-wrap{
-  position:absolute;top:60px;left:20px;z-index:50;
-  background:rgba(3,7,13,0.92);
-  border:1px solid var(--border);
-  border-radius:10px;padding:12px 16px;
-  width:160px;
-}
-.gauge-title{font-size:0.58rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
-.gauge-bar-wrap{display:flex;gap:2px;margin-bottom:8px;}
-.gauge-seg{flex:1;height:8px;border-radius:2px;transition:opacity 0.5s;}
-.gauge-labels{display:flex;justify-content:space-between;font-size:0.55rem;color:var(--muted);}
-.gauge-current{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;margin-top:8px;text-align:center;}
-
-/* ── MINI STATS BAR ── */
-.mini-stats{
-  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);z-index:50;
-  display:flex;gap:2px;
-  pointer-events:none;
-}
-.ms{
-  background:rgba(3,7,13,0.92);
-  border:1px solid var(--border);
-  border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;
-}
-.ms-v{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;line-height:1;}
-.ms-l{font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+.n-btn{background:linear-gradient(135deg,var(--green),var(--blue));color:#03070d;
+  font-size:0.72rem;font-weight:800;padding:6px 14px;border-radius:6px;text-decoration:none;}
 
 /* ── MAIN ── */
 .main{display:flex;flex:1;overflow:hidden;position:relative;}
 
 /* ── MAP ── */
-.map-wrap{flex:1;position:relative;overflow:hidden;cursor:crosshair;}
+.map-wrap{flex:1;position:relative;overflow:hidden;}
+#map-svg{position:absolute;inset:0;z-index:1;cursor:grab;}
+#map-svg:active{cursor:grabbing;}
 #mapCanvas{position:absolute;inset:0;z-index:2;pointer-events:none;}
-#map-svg{position:absolute;inset:0;z-index:1;}
-#map-svg path{fill:#0d2240;stroke:#1a4060;stroke-width:0.5;cursor:pointer;transition:fill 0.2s;}
-#map-svg path:hover{fill:#0e3560;}
-#map-svg path.sphere{fill:#0a1628;}
-#map-svg path.highlighted{fill:#0d3520;}
-.map-vignette{
-  position:absolute;inset:0;z-index:3;pointer-events:none;
-  background:radial-gradient(ellipse 90% 90% at 50% 50%,transparent 50%,rgba(3,7,13,0.6) 100%);
-}
+.vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse 95% 95% at 50% 50%,transparent 50%,rgba(3,7,13,0.65) 100%);}
+
+/* ── SEARCH ── */
+.search-wrap{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:50;width:260px;}
+.search-box{display:flex;align-items:center;background:rgba(3,7,13,0.9);
+  border:1px solid rgba(0,255,150,0.2);border-radius:10px;overflow:visible;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);}
+.search-icon{padding:0 10px 0 12px;color:rgba(0,255,150,0.5);font-size:14px;flex-shrink:0;}
+.search-input{flex:1;background:none;border:none;outline:none;color:#fff;
+  font-family:'Inter',sans-serif;font-size:0.82rem;padding:9px 10px 9px 0;min-width:0;}
+.search-input::placeholder{color:rgba(255,255,255,0.2);}
+.search-clear{padding:0 10px;color:var(--muted);cursor:pointer;font-size:14px;
+  display:none;background:none;border:none;transition:color 0.2s;flex-shrink:0;}
+.search-clear:hover{color:#fff;}
+.search-clear.show{display:block;}
+.search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:rgba(3,7,13,0.98);border:1px solid rgba(0,255,150,0.15);
+  border-radius:10px;overflow:hidden;display:none;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:100;}
+.search-dropdown.show{display:block;}
+.s-item{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;}
+.s-item:last-child{border-bottom:none;}
+.s-item:hover{background:rgba(0,255,150,0.06);}
+.s-flag{font-size:16px;flex-shrink:0;}
+.s-name{font-size:0.8rem;color:var(--text);flex:1;}
+.s-count{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--muted);}
+.s-type{font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;}
+.s-empty{padding:14px;text-align:center;font-size:0.78rem;color:var(--muted);}
+
+/* ── GAUGE ── */
+.gauge{position:absolute;top:70px;left:14px;z-index:50;
+  background:rgba(3,7,13,0.9);border:1px solid rgba(0,255,150,0.1);
+  border-radius:10px;padding:10px 14px;width:148px;}
+.gauge-title{font-size:0.58rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;}
+.gauge-segs{display:flex;gap:2px;margin-bottom:6px;}
+.gseg{flex:1;height:7px;border-radius:2px;}
+.gauge-labels{display:flex;justify-content:space-between;font-size:0.52rem;color:var(--muted);}
+.gauge-val{font-family:'JetBrains Mono',monospace;font-size:0.95rem;font-weight:700;
+  margin-top:8px;text-align:center;transition:color 0.5s;}
+
+/* ── LEGEND ── */
+.legend{position:absolute;bottom:54px;left:14px;z-index:50;
+  background:rgba(3,7,13,0.9);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+.leg-item{display:flex;align-items:center;gap:8px;font-size:0.68rem;color:var(--muted);}
+.leg-line{width:18px;height:2px;border-radius:1px;}
+
+/* ── ZOOM ── */
+.zooms{position:absolute;bottom:54px;right:14px;z-index:50;
+  display:flex;flex-direction:column;gap:2px;}
+.zbtn{width:30px;height:30px;background:rgba(3,7,13,0.9);border:1px solid rgba(0,255,150,0.15);
+  border-radius:6px;color:var(--green);font-size:15px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.zbtn:hover{background:rgba(0,255,150,0.1);}
+
+/* ── CREDIT ── */
+.credit{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);
+  font-size:0.58rem;color:rgba(255,255,255,0.12);z-index:10;white-space:nowrap;}
+.credit a{color:rgba(0,255,150,0.3);text-decoration:none;}
 
 /* ── SIDEBAR ── */
-.sidebar{
-  width:268px;flex-shrink:0;
-  background:rgba(3,7,13,0.98);
-  border-left:1px solid rgba(0,255,150,0.08);
-  display:flex;flex-direction:column;overflow:hidden;z-index:10;
-}
-.sb-section{border-bottom:1px solid rgba(255,255,255,0.04);padding:12px 14px;}
-.sb-title{font-size:0.58rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;}
-.sb-title-line{flex:1;height:1px;background:rgba(0,255,150,0.08);margin-left:8px;}
+.sidebar{width:268px;flex-shrink:0;background:rgba(3,7,13,0.98);
+  border-left:1px solid rgba(0,255,150,0.07);display:flex;flex-direction:column;overflow:hidden;z-index:10;}
+.sb-sec{border-bottom:1px solid rgba(255,255,255,0.04);padding:11px 14px;}
+.sb-ttl{font-size:0.58rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+.sb-ttl::after{content:'';flex:1;height:1px;background:rgba(0,255,150,0.07);}
 
-/* Attack types */
-.type-grid{display:flex;flex-direction:column;gap:5px;}
-.type-row{display:flex;align-items:center;gap:6px;}
-.type-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.type-name{font-size:0.72rem;color:var(--muted);width:72px;flex-shrink:0;}
-.type-bar-wrap{flex:1;height:3px;background:rgba(255,255,255,0.05);border-radius:99px;overflow:hidden;}
-.type-bar{height:100%;border-radius:99px;transition:width 0.8s ease;}
-.type-count{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text);width:36px;text-align:right;}
+/* Type rows */
+.type-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.tdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.tname{font-size:0.72rem;color:var(--muted);width:74px;flex-shrink:0;}
+.tbar-wrap{flex:1;height:3px;background:rgba(255,255,255,0.05);border-radius:99px;overflow:hidden;}
+.tbar{height:100%;border-radius:99px;transition:width 0.8s ease;}
+.tcount{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text);width:36px;text-align:right;}
 
-/* Countries */
-.country-list{display:flex;flex-direction:column;gap:4px;}
-.country-row{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px;border-radius:4px;transition:background 0.2s;}
-.country-row:hover{background:rgba(255,255,255,0.03);}
-.country-rank{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--muted);width:12px;}
-.country-flag{font-size:13px;}
-.country-name{font-size:0.72rem;color:var(--muted);flex:1;}
-.country-bar-wrap{width:50px;height:2px;background:rgba(255,255,255,0.05);border-radius:99px;overflow:hidden;}
-.country-bar{height:100%;border-radius:99px;background:var(--red);transition:width 0.8s;}
-.country-count{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text);width:32px;text-align:right;}
+/* Country rows */
+.c-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer;
+  padding:3px;border-radius:4px;transition:background 0.15s;}
+.c-row:hover{background:rgba(255,255,255,0.03);}
+.c-rank{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--muted);width:12px;}
+.c-flag{font-size:13px;}
+.c-name{font-size:0.72rem;color:var(--muted);flex:1;}
+.c-bar-wrap{width:48px;height:2px;background:rgba(255,255,255,0.05);border-radius:99px;overflow:hidden;}
+.c-bar{height:100%;border-radius:99px;background:var(--red);transition:width 0.8s;}
+.c-count{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text);width:34px;text-align:right;}
 
 /* Feed */
 .feed{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:3px;}
 .feed::-webkit-scrollbar{width:2px;}
 .feed::-webkit-scrollbar-thumb{background:rgba(0,255,150,0.15);}
-.feed-item{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:5px;padding:6px 9px;animation:feedIn 0.3s ease;flex-shrink:0;border-left:2px solid;}
-@keyframes feedIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.feed-item{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);
+  border-left:2px solid;border-radius:5px;padding:6px 9px;animation:feedIn 0.3s ease;flex-shrink:0;}
+@keyframes feedIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
 .feed-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
 .feed-type{font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
 .feed-time{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--muted);}
 .feed-route{font-size:0.68rem;color:var(--muted);}
-.feed-route span{color:var(--text);font-weight:600;}
-.feed-severity{font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+.feed-route b{color:var(--text);font-weight:600;}
+.feed-sev{font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
 
-/* ── BOTTOM BAR ── */
-.bottom-bar{
-  position:absolute;bottom:0;left:0;right:268px;height:44px;
-  background:rgba(3,7,13,0.98);border-top:1px solid rgba(0,255,150,0.08);
-  display:flex;align-items:center;z-index:10;overflow:hidden;
-}
-.bstat{display:flex;align-items:center;gap:8px;padding:0 16px;border-right:1px solid rgba(255,255,255,0.05);height:100%;flex-shrink:0;}
-.bstat-ico{font-size:14px;}
-.bstat-info{}
-.bstat-v{font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:700;line-height:1;}
-.bstat-l{font-size:0.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+/* ── BOTTOM ── */
+.bot{position:absolute;bottom:0;left:0;right:268px;height:46px;
+  background:rgba(3,7,13,0.98);border-top:1px solid rgba(0,255,150,0.07);
+  display:flex;align-items:center;z-index:10;overflow:hidden;}
+.bstat{display:flex;align-items:center;gap:8px;padding:0 16px;
+  border-right:1px solid rgba(255,255,255,0.05);height:100%;flex-shrink:0;}
+.bstat-ico{font-size:13px;}
+.bv{font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:700;line-height:1;}
+.bl{font-size:0.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
 .ticker-wrap{flex:1;overflow:hidden;position:relative;}
-.ticker-wrap::before,.ticker-wrap::after{content:'';position:absolute;top:0;bottom:0;width:30px;z-index:1;}
+.ticker-wrap::before,.ticker-wrap::after{content:'';position:absolute;top:0;bottom:0;width:28px;z-index:1;}
 .ticker-wrap::before{left:0;background:linear-gradient(90deg,rgba(3,7,13,0.98),transparent);}
 .ticker-wrap::after{right:0;background:linear-gradient(90deg,transparent,rgba(3,7,13,0.98));}
-.ticker-track{display:flex;animation:ticker 50s linear infinite;width:max-content;}
-.tick-item{display:flex;align-items:center;gap:6px;padding:0 20px;font-size:0.65rem;color:var(--muted);white-space:nowrap;}
-.tick-dot{width:3px;height:3px;border-radius:50%;}
+.ticker{display:flex;animation:ticker 50s linear infinite;width:max-content;}
+.tick{display:flex;align-items:center;gap:6px;padding:0 20px;font-size:0.65rem;color:var(--muted);white-space:nowrap;}
+@keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 
-/* Credit */
-.credit{position:absolute;bottom:52px;left:16px;font-size:0.58rem;color:rgba(255,255,255,0.12);z-index:10;}
-.map-legend{
-  position:absolute;bottom:80px;left:16px;z-index:50;
-  background:rgba(3,7,13,0.88);
-  border:1px solid rgba(255,255,255,0.06);
-  border-radius:8px;padding:10px 14px;
-  display:flex;flex-direction:column;gap:6px;
-}
-.legend-item{display:flex;align-items:center;gap:8px;font-size:0.68rem;color:rgba(255,255,255,0.45);}
-.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.credit a{color:rgba(0,255,150,0.3);text-decoration:none;}
-.credit a:hover{color:rgba(0,255,150,0.6);}
-
-/* Colors */
-.ddos{color:#ff2d4a;} .ddos-b{background:#ff2d4a;}
-.brute{color:#ff6b2b;} .brute-b{background:#ff6b2b;}
-.ransom{color:#8b5cf6;} .ransom-b{background:#8b5cf6;}
-.phish{color:#ffd60a;} .phish-b{background:#ffd60a;}
-.scan{color:#00b8ff;} .scan-b{background:#00b8ff;}
-.malware{color:#00ff96;} .malware-b{background:#00ff96;}
+/* colors */
+.ddos{color:#ff2d4a;}.brute{color:#ff8c42;}.ransom{color:#8b5cf6;}.phish{color:#ffd60a;}.scan{color:#00b8ff;}.malware{color:#00ff96;}
 </style>
 </head>
 <body>
 
-<!-- Alert Overlay -->
-<div class="alert-overlay" id="alertOverlay">
+<!-- Alert -->
+<div class="alert" id="alertOverlay">
   <div class="alert-box">
-    <div class="alert-header">
-      <span class="alert-icon">🚨</span>
-      <span class="alert-title">CRITICAL ALERT</span>
-    </div>
+    <div class="alert-icon">🚨</div>
+    <div class="alert-title">CRITICAL ALERT</div>
     <div class="alert-type" id="alertType">—</div>
     <div class="alert-route" id="alertRoute">—</div>
-    <button class="alert-close" onclick="closeAlert()">Dismiss</button>
+    <button class="alert-close" onclick="document.getElementById('alertOverlay').classList.remove('show')">DISMISS</button>
   </div>
 </div>
 
-<!-- Country Detail Panel -->
-<div class="country-panel" id="countryPanel">
-  <div class="cp-header">
-    <span class="cp-flag" id="cp-flag">🌐</span>
-    <span class="cp-name" id="cp-name">—</span>
-    <button class="cp-close" onclick="closeCountryPanel()">✕</button>
+<!-- Country Popup -->
+<div class="cpop" id="cpop">
+  <div class="cpop-head">
+    <span class="cpop-flag" id="cpop-flag">🌐</span>
+    <span class="cpop-name" id="cpop-name">—</span>
+    <span class="cpop-badge" id="cpop-badge"></span>
+    <button class="cpop-close" onclick="document.getElementById('cpop').classList.remove('show')">✕</button>
   </div>
-  <div class="cp-stat"><span class="cp-lbl">Total attacks</span><span class="cp-val" id="cp-total">—</span></div>
-  <div class="cp-stat"><span class="cp-lbl">Top attack type</span><span class="cp-val" id="cp-type">—</span></div>
-  <div class="cp-stat"><span class="cp-lbl">Last seen</span><span class="cp-val" id="cp-time">—</span></div>
-  <div class="cp-stat"><span class="cp-lbl">Threat level</span><span class="cp-val" id="cp-threat">—</span></div>
+  <div class="cpop-row"><span class="cpop-lbl">Total attacks</span><span class="cpop-val" id="cpop-total">—</span></div>
+  <div class="cpop-row"><span class="cpop-lbl">Top attack type</span><span class="cpop-val" id="cpop-type">—</span></div>
+  <div class="cpop-row"><span class="cpop-lbl">Threat level</span><span class="cpop-val" id="cpop-threat">—</span></div>
+  <div class="cpop-row"><span class="cpop-lbl">Status</span><span class="cpop-val" id="cpop-status">—</span></div>
+  <div class="cpop-live">
+    <div class="cpop-live-dot"></div>
+    <span>Active attacks/min</span>
+    <span class="cpop-atk-now" id="cpop-live-val">—</span>
+  </div>
 </div>
 
 <nav>
   <div class="n-left">
-    <div class="n-logo"><div class="n-logo-icon">🌐</div>CyberWatch</div>
-    <div class="live-badge"><span class="live-dot"></span>Live Feed</div>
-    <div class="threat-level" id="threatBadge" style="border-color:rgba(255,165,0,0.4);color:#ffa500;background:rgba(255,165,0,0.08);">
-      ⚠️ ELEVATED
-    </div>
+    <div class="n-logo"><div class="n-icon">🌐</div>CyberWatch</div>
+    <div class="live-badge"><span class="live-dot"></span>Live</div>
+    <div class="threat-badge" id="threatBadge">⚡ ELEVATED</div>
   </div>
   <div class="n-center">
-    <div class="n-stat"><div class="n-stat-v" style="color:var(--red)" id="nav-aps">0</div><div class="n-stat-l">Attacks/sec</div></div>
-    <div class="n-stat"><div class="n-stat-v" style="color:var(--yellow)" id="nav-total">0</div><div class="n-stat-l">Today</div></div>
-    <div class="n-stat"><div class="n-stat-v" style="color:var(--blue)" id="nav-countries">20</div><div class="n-stat-l">Countries</div></div>
-    <div class="n-stat"><div class="n-stat-v" style="color:var(--green)" id="nav-blocked">0</div><div class="n-stat-l">Blocked</div></div>
+    <div class="nstat"><div class="nstat-v" style="color:var(--red)" id="n-aps">0</div><div class="nstat-l">Attacks/sec</div></div>
+    <div class="nstat"><div class="nstat-v" style="color:var(--yellow)" id="n-total">0</div><div class="nstat-l">Today</div></div>
+    <div class="nstat"><div class="nstat-v" style="color:var(--blue)">20</div><div class="nstat-l">Countries</div></div>
+    <div class="nstat"><div class="nstat-v" style="color:var(--green)" id="n-blocked">0</div><div class="nstat-l">Blocked</div></div>
   </div>
   <div class="n-right">
     <a href="https://rahuldev7-web.github.io" target="_blank" class="n-link">Portfolio</a>
@@ -299,129 +272,90 @@ nav{
 </nav>
 
 <div class="main">
-  <!-- MOBILE FALLBACK -->
-  <div class="mobile-fallback">
-    <div style="font-size:3rem">🌐</div>
-    <h2>CyberWatch</h2>
-    <p>This dashboard is optimized for desktop. Visit on a larger screen for the full experience.</p>
-    <a href="https://rahuldev7-web.github.io/passguard">Try PassGuard instead →</a>
-    <p style="font-size:0.75rem;margin-top:8px;">Built by <a href="https://rahuldev7-web.github.io">Kiran Rahul Pabboju</a> · M.S. Cybersecurity</p>
-  </div>
-
   <div class="map-wrap" id="mapWrap">
     <svg id="map-svg"></svg>
     <canvas id="mapCanvas"></canvas>
-    <div class="map-vignette"></div>
-    <div class="intro-overlay" id="introOverlay">
-      <div class="intro-title">Live Global Threat Intelligence</div>
-      <div class="intro-hint">
-        <div class="hint-item">🖱️ Scroll to zoom</div>
-        <div class="hint-item">✋ Drag to pan</div>
-        <div class="hint-item">🔍 Search countries</div>
-        <div class="hint-item">🖱️ Click country for details</div>
+    <div class="vignette"></div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search country..." autocomplete="off" spellcheck="false">
+        <button class="search-clear" id="searchClear">✕</button>
       </div>
-    </div>
-    <div class="map-tooltip" id="mapTooltip">
-      <div class="tt-name" id="tt-name">—</div>
-      <div class="tt-stat"><span>Attacks</span><span class="tt-val" id="tt-attacks">—</span></div>
-      <div class="tt-stat"><span>Top type</span><span class="tt-val" id="tt-type">—</span></div>
-      <div class="tt-stat"><span>Status</span><span class="tt-val" id="tt-status" style="color:#ff2d4a">ACTIVE</span></div>
-    </div>
-    <div class="map-search" id="mapSearch">
-      <input type="text" id="searchInput" placeholder="Search country...">
-      <div class="search-results" id="searchResults"></div>
-      <button class="map-search-btn" id="searchBtn">🔍</button>
-    </div>
-    <div class="zoom-controls">
-      <button class="zoom-btn" id="zoomIn">+</button>
-      <button class="zoom-btn" id="zoomReset">⊙</button>
-      <button class="zoom-btn" id="zoomOut">−</button>
+      <div class="search-dropdown" id="searchDropdown"></div>
     </div>
 
-    <!-- Severity Gauge -->
-    <div class="gauge-wrap">
+    <!-- Gauge -->
+    <div class="gauge">
       <div class="gauge-title">Threat Severity</div>
-      <div class="gauge-bar-wrap" id="gaugeBar"></div>
+      <div class="gauge-segs" id="gaugeSegs"></div>
       <div class="gauge-labels"><span>LOW</span><span>MED</span><span>HIGH</span><span>CRIT</span></div>
-      <div class="gauge-current" id="gaugeCurrent">MEDIUM</div>
+      <div class="gauge-val" id="gaugeVal">MEDIUM</div>
     </div>
 
-    <!-- Mini Stats -->
+    <!-- Legend -->
+    <div class="legend">
+      <div class="leg-item"><div class="leg-line" style="background:#ff2d4a;box-shadow:0 0 4px #ff2d4a"></div>Attack Source</div>
+      <div class="leg-item"><div class="leg-line" style="background:#00ff96;box-shadow:0 0 4px #00ff96"></div>Target Country</div>
+      <div class="leg-item"><div class="leg-line" style="background:#ffd60a;box-shadow:0 0 4px #ffd60a"></div>Source + Target</div>
+      <div class="leg-item"><div class="leg-line" style="background:#1e70a0"></div>North America</div>
+      <div class="leg-item"><div class="leg-line" style="background:#1e8060"></div>Europe</div>
+      <div class="leg-item"><div class="leg-line" style="background:#6a4010"></div>Africa</div>
+      <div class="leg-item"><div class="leg-line" style="background:#404080"></div>Asia</div>
+    </div>
 
+    <!-- Zoom -->
+    <div class="zooms">
+      <button class="zbtn" id="zIn">+</button>
+      <button class="zbtn" id="zReset">⊙</button>
+      <button class="zbtn" id="zOut">−</button>
+    </div>
 
     <div class="credit">Built by <a href="https://rahuldev7-web.github.io" target="_blank">Kiran Rahul Pabboju</a> · M.S. Cybersecurity · <a href="https://rahuldev7-web.github.io/passguard" target="_blank">PassGuard</a></div>
-    <div class="map-legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#ff2d4a;box-shadow:0 0 6px #ff2d4a"></div><span>Attack Source</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#00ff96;box-shadow:0 0 6px #00ff96"></div><span>Target Country</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#1e4060"></div><span>Neutral</span></div>
-    </div>
   </div>
 
   <div class="sidebar">
-    <div class="sb-section">
-      <div class="sb-title">Attack Breakdown <div class="sb-title-line"></div></div>
-      <div class="type-grid" id="typeGrid"></div>
+    <div class="sb-sec">
+      <div class="sb-ttl">Attack Breakdown</div>
+      <div id="typeGrid"></div>
     </div>
-    <div class="sb-section">
-      <div class="sb-title">Top Sources <div class="sb-title-line"></div></div>
-      <div class="country-list" id="sourceList"></div>
+    <div class="sb-sec">
+      <div class="sb-ttl">Top Sources</div>
+      <div id="srcList"></div>
     </div>
-    <div class="sb-section" style="border-bottom:none;padding-bottom:4px;">
-      <div class="sb-title">Live Intelligence Feed <div class="sb-title-line"></div></div>
+    <div class="sb-sec" style="border-bottom:none;padding-bottom:4px;">
+      <div class="sb-ttl">Live Intelligence Feed</div>
     </div>
     <div class="feed" id="feed"></div>
   </div>
 </div>
 
-<div class="bottom-bar">
-  <div class="bstat">
-    <div class="bstat-ico">⚡</div>
-    <div class="bstat-info"><div class="bstat-v ddos" id="b-ddos">0</div><div class="bstat-l">DDoS</div></div>
-  </div>
-  <div class="bstat">
-    <div class="bstat-ico">🔑</div>
-    <div class="bstat-info"><div class="bstat-v brute" id="b-brute">0</div><div class="bstat-l">Brute Force</div></div>
-  </div>
-  <div class="bstat">
-    <div class="bstat-ico">💀</div>
-    <div class="bstat-info"><div class="bstat-v ransom" id="b-ransom">0</div><div class="bstat-l">Ransomware</div></div>
-  </div>
-  <div class="bstat">
-    <div class="bstat-ico">🎣</div>
-    <div class="bstat-info"><div class="bstat-v phish" id="b-phish">0</div><div class="bstat-l">Phishing</div></div>
-  </div>
-  <div class="bstat">
-    <div class="bstat-ico">🔍</div>
-    <div class="bstat-info"><div class="bstat-v scan" id="b-scan">0</div><div class="bstat-l">Port Scan</div></div>
-  </div>
-  <div class="ticker-wrap">
-    <div class="ticker-track" id="ticker"></div>
-  </div>
+<div class="bot">
+  <div class="bstat"><span class="bstat-ico">⚡</span><div><div class="bv ddos" id="b-ddos">0</div><div class="bl">DDoS</div></div></div>
+  <div class="bstat"><span class="bstat-ico">🔑</span><div><div class="bv brute" id="b-brute">0</div><div class="bl">Brute</div></div></div>
+  <div class="bstat"><span class="bstat-ico">💀</span><div><div class="bv ransom" id="b-ransom">0</div><div class="bl">Ransom</div></div></div>
+  <div class="bstat"><span class="bstat-ico">🎣</span><div><div class="bv phish" id="b-phish">0</div><div class="bl">Phish</div></div></div>
+  <div class="bstat"><span class="bstat-ico">🔍</span><div><div class="bv scan" id="b-scan">0</div><div class="bl">Scan</div></div></div>
+  <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
 </div>
 
 <script>
-// ── DATA ─────────────────────────────────────
-const COUNTRIES = [
-  {name:'China',flag:'🇨🇳',lat:35,lon:105,weight:18,topType:'DDoS'},
-  {name:'Russia',flag:'🇷🇺',lat:60,lon:90,weight:15,topType:'Ransomware'},
-  {name:'United States',flag:'🇺🇸',lat:38,lon:-97,weight:14,topType:'Phishing'},
-  {name:'Brazil',flag:'🇧🇷',lat:-10,lon:-55,weight:6,topType:'Brute Force'},
-  {name:'India',flag:'🇮🇳',lat:20,lon:78,weight:7,topType:'Port Scan'},
-  {name:'Germany',flag:'🇩🇪',lat:51,lon:10,weight:5,topType:'DDoS'},
-  {name:'Netherlands',flag:'🇳🇱',lat:52,lon:5,weight:6,topType:'Phishing'},
-  {name:'Ukraine',flag:'🇺🇦',lat:49,lon:32,weight:5,topType:'Ransomware'},
-  {name:'United Kingdom',flag:'🇬🇧',lat:54,lon:-2,weight:4,topType:'Phishing'},
-  {name:'Iran',flag:'🇮🇷',lat:32,lon:53,weight:5,topType:'DDoS'},
-  {name:'North Korea',flag:'🇰🇵',lat:40,lon:127,weight:4,topType:'Ransomware'},
-  {name:'France',flag:'🇫🇷',lat:46,lon:2,weight:3,topType:'Port Scan'},
-  {name:'Vietnam',flag:'🇻🇳',lat:14,lon:108,weight:3,topType:'Malware'},
-  {name:'Indonesia',flag:'🇮🇩',lat:-5,lon:120,weight:3,topType:'Phishing'},
-  {name:'Pakistan',flag:'🇵🇰',lat:30,lon:70,weight:3,topType:'Brute Force'},
-  {name:'Japan',flag:'🇯🇵',lat:36,lon:138,weight:3,topType:'Port Scan'},
-  {name:'Canada',flag:'🇨🇦',lat:56,lon:-96,weight:2,topType:'Phishing'},
-  {name:'South Korea',flag:'🇰🇷',lat:37,lon:127,weight:2,topType:'DDoS'},
-  {name:'Turkey',flag:'🇹🇷',lat:39,lon:35,weight:2,topType:'Brute Force'},
-  {name:'Singapore',flag:'🇸🇬',lat:1,lon:104,weight:2,topType:'Malware'},
+// ── DATA ─────────────────────────────────────────────────
+const SOURCES = [
+  {name:'China',flag:'🇨🇳',lat:35,lon:105,w:18,type:'DDoS',both:false},
+  {name:'Russia',flag:'🇷🇺',lat:60,lon:90,w:15,type:'Ransomware',both:false},
+  {name:'United States',flag:'🇺🇸',lat:38,lon:-97,w:12,type:'Phishing',both:true},
+  {name:'Brazil',flag:'🇧🇷',lat:-10,lon:-55,w:6,type:'Brute Force',both:true},
+  {name:'India',flag:'🇮🇳',lat:20,lon:78,w:7,type:'Port Scan',both:true},
+  {name:'Germany',flag:'🇩🇪',lat:51,lon:10,w:5,type:'DDoS',both:true},
+  {name:'Netherlands',flag:'🇳🇱',lat:52,lon:5,w:6,type:'Phishing',both:false},
+  {name:'Ukraine',flag:'🇺🇦',lat:49,lon:32,w:5,type:'Ransomware',both:false},
+  {name:'Iran',flag:'🇮🇷',lat:32,lon:53,w:5,type:'DDoS',both:false},
+  {name:'North Korea',flag:'🇰🇵',lat:40,lon:127,w:4,type:'Ransomware',both:false},
+  {name:'Vietnam',flag:'🇻🇳',lat:14,lon:108,w:3,type:'Malware',both:false},
+  {name:'Pakistan',flag:'🇵🇰',lat:30,lon:70,w:3,type:'Brute Force',both:false},
 ];
 
 const TARGETS = [
@@ -439,567 +373,580 @@ const TARGETS = [
   {name:'Singapore',flag:'🇸🇬',lat:1,lon:104},
   {name:'Italy',flag:'🇮🇹',lat:42,lon:12},
   {name:'Spain',flag:'🇪🇸',lat:40,lon:-3},
-  {name:'Ukraine',flag:'🇺🇦',lat:49,lon:32},
 ];
 
-const ATTACK_TYPES = [
-  {name:'DDoS',cls:'ddos',color:'#ff2d4a',weight:28,icon:'⚡',severity:'HIGH'},
-  {name:'Brute Force',cls:'brute',color:'#ff6b2b',weight:22,icon:'🔑',severity:'MEDIUM'},
-  {name:'Ransomware',cls:'ransom',color:'#8b5cf6',weight:10,icon:'💀',severity:'CRITICAL'},
-  {name:'Phishing',cls:'phish',color:'#ffd60a',weight:20,icon:'🎣',severity:'MEDIUM'},
-  {name:'Port Scan',cls:'scan',color:'#00b8ff',weight:14,icon:'🔍',severity:'LOW'},
-  {name:'Malware',cls:'malware',color:'#00ff96',weight:6,icon:'🦠',severity:'HIGH'},
+const ALL_COUNTRIES = [...SOURCES,
+  ...TARGETS.filter(t=>!SOURCES.find(s=>s.name===t.name))
+    .map(t=>({...t,w:1,type:'—',both:false}))
 ];
 
-const SEVERITY_COLORS = {
-  'LOW':'#00b8ff','MEDIUM':'#ffd60a','HIGH':'#ff6b2b','CRITICAL':'#ff2d4a'
+const TYPES = [
+  {name:'DDoS',cls:'ddos',color:'#ff2d4a',w:28,icon:'⚡',sev:'HIGH'},
+  {name:'Brute Force',cls:'brute',color:'#ff8c42',w:22,icon:'🔑',sev:'MEDIUM'},
+  {name:'Ransomware',cls:'ransom',color:'#8b5cf6',w:10,icon:'💀',sev:'CRITICAL'},
+  {name:'Phishing',cls:'phish',color:'#ffd60a',w:20,icon:'🎣',sev:'MEDIUM'},
+  {name:'Port Scan',cls:'scan',color:'#00b8ff',w:14,icon:'🔍',sev:'LOW'},
+  {name:'Malware',cls:'malware',color:'#00ff96',w:6,icon:'🦠',sev:'HIGH'},
+];
+
+const SEVS = [{l:'LOW',c:'#00b8ff'},{l:'MEDIUM',c:'#ffd60a'},{l:'HIGH',c:'#ff8c42'},{l:'CRITICAL',c:'#ff2d4a'}];
+const SEG_COLORS = ['#00b8ff','#ffd60a','#ff8c42','#ff2d4a'];
+
+// ── STATE ────────────────────────────────────────────────
+let total = 500000 + Math.floor(Math.random()*400000);
+let blocked = Math.floor(total*0.73);
+let aps = 0, apsCount = 0;
+let typeCounts = {}, srcCounts = {}, liveCounts = {};
+let sevIdx = 1, alertCooldown = false, lastAlert = 0;
+let selectedCountry = null;
+
+TYPES.forEach(t => typeCounts[t.name] = Math.floor(Math.random()*50000)+10000);
+SOURCES.forEach(s => { srcCounts[s.name] = Math.floor(Math.random()*130000)+20000; liveCounts[s.name] = 0; });
+
+// ── MAP ──────────────────────────────────────────────────
+const svg = d3.select('#map-svg');
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, proj, pathGen, mapG, zoom;
+let arcs = [], pulses = [];
+
+// Name aliases for TopoJSON country names
+const NAME_MAP = {
+  'Russian Federation':'Russia',
+  'United States of America':'United States',
+  'United Kingdom of Great Britain and Northern Ireland':'United Kingdom',
+  'Korea, Republic of':'South Korea',
+  "Korea, Democratic People's Republic of":'North Korea',
+  'Iran (Islamic Republic of)':'Iran',
+  'Viet Nam':'Vietnam',
+  'Syrian Arab Republic':'Syria',
+  'Bolivia (Plurinational State of)':'Bolivia',
+  'Venezuela (Bolivarian Republic of)':'Venezuela',
+  'Tanzania, United Republic of':'Tanzania',
+  'Congo, Democratic Republic of the':'Congo',
+  "Lao People's Democratic Republic":'Laos',
+  'Myanmar':'Myanmar',
+  'Czechia':'Czech Republic',
+  'North Macedonia':'Macedonia',
+  'Moldova, Republic of':'Moldova',
+  'Palestine, State of':'Palestine',
+  'Taiwan, Province of China':'Taiwan',
+  'Hong Kong':'Hong Kong',
 };
 
-// ── STATE ────────────────────────────────────
-let totalToday = Math.floor(Math.random()*600000)+600000;
-let blockedToday = Math.floor(totalToday*0.73);
-let apsCounter=0, attacksPerSec=0;
-let typeCounts={},sourceCounts={};
-ATTACK_TYPES.forEach(t=>typeCounts[t.name]=Math.floor(Math.random()*60000)+15000);
-COUNTRIES.slice(0,10).forEach(c=>sourceCounts[c.name]=Math.floor(Math.random()*150000)+30000);
-
-let severityLevel=1; // 0=LOW,1=MED,2=HIGH,3=CRIT
-let alertCooldown=false;
-let lastAlertTime=0;
-
-// ── MAP ──────────────────────────────────────
-const svg=d3.select('#map-svg');
-const canvas=document.getElementById('mapCanvas');
-const ctx=canvas.getContext('2d');
-let W,H,projection,path;
-let arcs=[],pulses=[],originDots=[];
-
-function resize(){
-  const wrap=document.getElementById('mapWrap');
-  W=wrap.clientWidth; H=wrap.clientHeight;
-  canvas.width=W; canvas.height=H;
-  svg.attr('width',W).attr('height',H);
-  projection=d3.geoNaturalEarth1().scale(W/6.2).translate([W/2,H/2.1]);
-  path=d3.geoPath().projection(projection);
-  if(window._world) drawMap();
+function normalizeName(name) {
+  return NAME_MAP[name] || name;
 }
 
-// Zoom behavior
-let zoom = d3.zoom()
-  .scaleExtent([0.8, 8])
-  .on('zoom', zoomed);
-
-function zoomed(event){
-  mapG.attr('transform', event.transform);
+function getCountryRole(rawName) {
+  const name = normalizeName(rawName);
+  const isSrc = SOURCES.some(s => s.name === name);
+  const isTgt = TARGETS.some(t => t.name === name);
+  if (isSrc && isTgt) return 'both';
+  if (isSrc) return 'source';
+  if (isTgt) return 'target';
+  return 'neutral';
 }
 
-let mapG;
+// Continent color map for neutral countries
+const CONTINENT_COLORS = {
+  // North America
+  'Canada':'#0a1e30','Mexico':'#0a1e30','Cuba':'#0a1e30','Haiti':'#0a1e30',
+  'Dominican Republic':'#0a1e30','Jamaica':'#0a1e30','Guatemala':'#0a1e30',
+  'Honduras':'#0a1e30','Nicaragua':'#0a1e30','Costa Rica':'#0a1e30',
+  'Panama':'#0a1e30','El Salvador':'#0a1e30','Belize':'#0a1e30',
+  // South America
+  'Argentina':'#0d1a28','Chile':'#0d1a28','Colombia':'#0d1a28','Peru':'#0d1a28',
+  'Venezuela':'#0d1a28','Ecuador':'#0d1a28','Bolivia':'#0d1a28','Paraguay':'#0d1a28',
+  'Uruguay':'#0d1a28','Guyana':'#0d1a28','Suriname':'#0d1a28',
+  // Europe
+  'France':'#081a14','Spain':'#081a14','Italy':'#081a14','Poland':'#081a14',
+  'Sweden':'#081a14','Norway':'#081a14','Finland':'#081a14','Denmark':'#081a14',
+  'Belgium':'#081a14','Switzerland':'#081a14','Austria':'#081a14','Portugal':'#081a14',
+  'Czechia':'#081a14','Romania':'#081a14','Hungary':'#081a14','Greece':'#081a14',
+  'Bulgaria':'#081a14','Slovakia':'#081a14','Croatia':'#081a14','Serbia':'#081a14',
+  'Bosnia and Herzegovina':'#081a14','Slovenia':'#081a14','Albania':'#081a14',
+  'North Macedonia':'#081a14','Montenegro':'#081a14','Kosovo':'#081a14',
+  'Lithuania':'#081a14','Latvia':'#081a14','Estonia':'#081a14','Belarus':'#081a14',
+  'Moldova':'#081a14','Ireland':'#081a14','Iceland':'#081a14',
+  // Africa
+  'Nigeria':'#151008','Ethiopia':'#151008','Egypt':'#151008','South Africa':'#151008',
+  'Kenya':'#151008','Ghana':'#151008','Tanzania':'#151008','Algeria':'#151008',
+  'Morocco':'#151008','Tunisia':'#151008','Libya':'#151008','Sudan':'#151008',
+  'Angola':'#151008','Mozambique':'#151008','Madagascar':'#151008','Cameroon':'#151008',
+  'Ivory Coast':'#151008','Niger':'#151008','Burkina Faso':'#151008','Mali':'#151008',
+  'Senegal':'#151008','Somalia':'#151008','Zimbabwe':'#151008','Zambia':'#151008',
+  // Middle East
+  'Saudi Arabia':'#150e08','Turkey':'#150e08','Israel':'#150e08','Iraq':'#150e08',
+  'Syria':'#150e08','Jordan':'#150e08','Lebanon':'#150e08','Yemen':'#150e08',
+  'Oman':'#150e08','United Arab Emirates':'#150e08','Kuwait':'#150e08','Qatar':'#150e08',
+  'Bahrain':'#150e08','Afghanistan':'#150e08',
+  // Asia
+  'China':'#150e08','Indonesia':'#0e1018','Thailand':'#0e1018','Myanmar':'#0e1018',
+  'Malaysia':'#0e1018','Philippines':'#0e1018','Cambodia':'#0e1018','Laos':'#0e1018',
+  'Bangladesh':'#0e1018','Sri Lanka':'#0e1018','Nepal':'#0e1018','Mongolia':'#0e1018',
+  'Kazakhstan':'#0e1018','Uzbekistan':'#0e1018','Kyrgyzstan':'#0e1018',
+  'Tajikistan':'#0e1018','Turkmenistan':'#0e1018','Azerbaijan':'#0e1018',
+  'Armenia':'#0e1018','Georgia':'#0e1018','Taiwan':'#0e1018',
+  // Oceania
+  'New Zealand':'#0a1820','Papua New Guinea':'#0a1820','Fiji':'#0a1820',
+};
 
-function drawMap(){
-  svg.selectAll('*').remove();
+// Stroke colors per continent for neutral countries
+const CONTINENT_STROKES = {
+  'na':'#1e6090','sa':'#1e5080','eu':'#1e7060','af':'#4a3010','me':'#5a3010','as':'#303060','oc':'#205060'
+};
 
-  // Ocean gradient
-  const defs = svg.append('defs');
-  const oceanGrad = defs.append('radialGradient')
-    .attr('id','oceanGrad')
-    .attr('cx','50%').attr('cy','45%').attr('r','55%');
-  oceanGrad.append('stop').attr('offset','0%').attr('stop-color','#0e2a4a');
-  oceanGrad.append('stop').attr('offset','60%').attr('stop-color','#081c36');
-  oceanGrad.append('stop').attr('offset','100%').attr('stop-color','#04101e');
+function getContinent(name) {
+  const na = ['Canada','Mexico','Cuba','Haiti','Dominican Republic','Jamaica','Guatemala','Honduras','Nicaragua','Costa Rica','Panama','El Salvador','Belize'];
+  const sa = ['Argentina','Chile','Colombia','Peru','Venezuela','Ecuador','Bolivia','Paraguay','Uruguay','Guyana','Suriname'];
+  const eu = ['France','Spain','Italy','Poland','Sweden','Norway','Finland','Denmark','Belgium','Switzerland','Austria','Portugal','Czechia','Romania','Hungary','Greece','Bulgaria','Slovakia','Croatia','Serbia','Slovenia','Albania','Lithuania','Latvia','Estonia','Belarus','Moldova','Ireland','Iceland','Bosnia and Herzegovina','North Macedonia','Montenegro'];
+  const af = ['Nigeria','Ethiopia','Egypt','South Africa','Kenya','Ghana','Tanzania','Algeria','Morocco','Tunisia','Libya','Sudan','Angola','Mozambique','Madagascar','Cameroon','Ivory Coast','Niger','Burkina Faso','Mali','Senegal','Somalia','Zimbabwe','Zambia'];
+  const me = ['Saudi Arabia','Turkey','Israel','Iraq','Syria','Jordan','Lebanon','Yemen','Oman','United Arab Emirates','Kuwait','Qatar','Bahrain','Afghanistan'];
+  const oc = ['New Zealand','Papua New Guinea','Fiji','Australia'];
+  if(na.includes(name)) return 'na';
+  if(sa.includes(name)) return 'sa';
+  if(eu.includes(name)) return 'eu';
+  if(af.includes(name)) return 'af';
+  if(me.includes(name)) return 'me';
+  if(oc.includes(name)) return 'oc';
+  return 'as';
+}
 
-  // Apply zoom
+const CONTINENT_STROKE_MAP = {
+  'na':'#1e70a0','sa':'#1e6090','eu':'#1e8060','af':'#6a4010','me':'#7a4a10','as':'#404080','oc':'#206070'
+};
+
+function countryFill(name) {
+  const r = getCountryRole(normalizeName(name));
+  if (r === 'source') return '#200818';
+  if (r === 'target') return '#081a10';
+  if (r === 'both')   return '#181008';
+  const cont = getContinent(name);
+  const fills = {'na':'#091828','sa':'#091420','eu':'#09180e','af':'#180e04','me':'#180c04','as':'#0c0e1e','oc':'#081418'};
+  return fills[cont] || '#0d1828';
+}
+
+function countryStroke(name) {
+  const r = getCountryRole(normalizeName(name));
+  if (r === 'source') return '#ff2d4a';
+  if (r === 'target') return '#00ff96';
+  if (r === 'both')   return '#ffd60a';
+  const cont = getContinent(name);
+  return CONTINENT_STROKE_MAP[cont] || '#206080';
+}
+
+function strokeWidth(name) {
+  const r = getCountryRole(normalizeName(name));
+  return (r === 'neutral') ? 0.6 : 1.4;
+}
+
+function resize() {
+  const wrap = document.getElementById('mapWrap');
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W; canvas.height = H;
+  svg.attr('width', W).attr('height', H);
+  proj = d3.geoNaturalEarth1().scale(W/6.2).translate([W/2, H/2.05]);
+  pathGen = d3.geoPath().projection(proj);
+  zoom = d3.zoom().scaleExtent([0.8,8]).on('zoom', e => mapG.attr('transform', e.transform));
   svg.call(zoom);
+  if (window._world) drawMap();
+}
 
+function drawMap() {
+  svg.selectAll('*').remove();
+  const defs = svg.append('defs');
+  const og = defs.append('radialGradient').attr('id','og').attr('cx','50%').attr('cy','45%').attr('r','55%');
+  og.append('stop').attr('offset','0%').attr('stop-color','#0d2040');
+  og.append('stop').attr('offset','100%').attr('stop-color','#040d1a');
+
+  svg.call(zoom);
   mapG = svg.append('g');
 
-  // Sphere (ocean)
-  mapG.append('path')
-    .datum({type:'Sphere'})
-    .attr('class','sphere')
-    .attr('d', path)
-    .attr('stroke','rgba(0,150,220,0.2)')
-    .attr('stroke-width',0.8);
+  // Ocean
+  mapG.append('path').datum({type:'Sphere'}).attr('d',pathGen)
+    .attr('fill','url(#og)').attr('stroke','rgba(0,150,220,0.15)').attr('stroke-width',0.8);
 
   // Graticule
-  const grat = d3.geoGraticule()();
-  mapG.append('path').datum(grat)
-    .attr('class','graticule')
-    .attr('d',path);
+  mapG.append('path').datum(d3.geoGraticule()()).attr('d',pathGen)
+    .attr('fill','none').attr('stroke','rgba(0,180,255,0.05)').attr('stroke-width',0.4);
 
   // Countries
   const features = topojson.feature(window._world, window._world.objects.countries).features;
-  mapG.append('g').attr('class','countries')
-    .selectAll('path')
-    .data(features)
-    .join('path')
-    .attr('class','country')
-    .attr('d', path)
-    .attr('fill', d => {
-      const name = d.properties?.name||'';
-      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
-      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
-      if(isSource && isTarget) return '#1a2a3a';
-      if(isSource) return '#1a1828';
-      if(isTarget) return '#0e2218';
-      return '#112038';
+  mapG.append('g').selectAll('path')
+    .data(features).join('path')
+    .attr('d', pathGen)
+    .attr('fill', d => countryFill(normalizeName(d.properties?.name||'')))
+    .attr('stroke', d => countryStroke(normalizeName(d.properties?.name||'')))
+    .attr('stroke-width', d => strokeWidth(normalizeName(d.properties?.name||'')))
+    .attr('stroke-linejoin','round')
+    .style('filter', d => {
+      const r = getCountryRole(normalizeName(d.properties?.name||''));
+      if (r === 'source') return 'drop-shadow(0 0 4px rgba(255,45,74,0.5))';
+      if (r === 'target') return 'drop-shadow(0 0 4px rgba(0,255,150,0.5))';
+      if (r === 'both')   return 'drop-shadow(0 0 4px rgba(255,214,10,0.5))';
+      const cont = getContinent(d.properties?.name||'');
+      const glows = {'na':'rgba(30,112,160,0.25)','sa':'rgba(30,96,144,0.25)','eu':'rgba(30,128,96,0.25)','af':'rgba(106,64,16,0.2)','me':'rgba(122,74,16,0.2)','as':'rgba(64,64,128,0.2)','oc':'rgba(32,96,112,0.2)'};
+      return 'drop-shadow(0 0 2px ' + (glows[cont]||'rgba(30,96,128,0.2)') + ')';
     })
-    .attr('stroke', d => {
-      const name = d.properties?.name||'';
-      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
-      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
-      if(isSource && isTarget) return '#ff6b2b';
-      if(isSource) return '#ff2d4a';
-      if(isTarget) return '#00ff96';
-      return '#1e4060';
+    .on('click', (event, d) => showCountryPopup(event, d))
+    .on('mouseover', function(event, d) {
+      const name = normalizeName(d.properties?.name||'');
+      const r = getCountryRole(name);
+      const hoverFill = r==='source'?'#2a1828':r==='target'?'#0d2e18':r==='both'?'#201828':'#162840';
+      d3.select(this).attr('fill', hoverFill).style('cursor','pointer');
     })
-    .attr('stroke-width', d => {
-      const name = d.properties?.name||'';
-      const isKey = [...COUNTRIES.slice(0,12), ...TARGETS.slice(0,8)].some(x=>x.name===name);
-      return isKey ? 1.2 : 0.4;
-    })
-    .on('mouseover', function(event, d){
-      const name = d.properties?.name||'';
-      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
-      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
-      if(isSource) d3.select(this).attr('fill','#2a1828').attr('stroke','#ff4d6d');
-      else if(isTarget) d3.select(this).attr('fill','#0d2e18').attr('stroke','#06ffa5');
-      else d3.select(this).attr('fill','#1a3050').attr('stroke','#3a70a0');
-      showTooltip(event, d);
-    })
-    .on('mousemove', moveTooltip)
-    .on('mouseout', function(event, d){
-      const name = d.properties?.name||'';
-      const isSource = COUNTRIES.slice(0,12).some(x=>x.name===name);
-      const isTarget = TARGETS.slice(0,8).some(x=>x.name===name);
-      if(isSource && isTarget){ d3.select(this).attr('fill','#1a2a3a').attr('stroke','#ff6b2b'); }
-      else if(isSource){ d3.select(this).attr('fill','#1a1828').attr('stroke','#ff2d4a'); }
-      else if(isTarget){ d3.select(this).attr('fill','#0e2218').attr('stroke','#00ff96'); }
-      else{ d3.select(this).attr('fill','#112038').attr('stroke','#1e4060'); }
-      hideTooltip();
-    })
-    .on('click', function(event, d){ zoomToCountry(d); });
+    .on('mouseout', function(event, d) {
+      d3.select(this).attr('fill', countryFill(normalizeName(d.properties?.name||'')));
+    });
 
-  // Borders mesh
+  // Border mesh
   mapG.append('path')
     .datum(topojson.mesh(window._world, window._world.objects.countries, (a,b)=>a!==b))
-    .attr('class','borders')
-    .attr('d', path);
+    .attr('d',pathGen).attr('fill','none')
+    .attr('stroke','rgba(30,80,120,0.3)').attr('stroke-width',0.3);
 
-  // Country names (zoom level > 2)
   setupSearch(features);
 }
 
-// Tooltip
-function showTooltip(event, d){
-  const tt = document.getElementById('mapTooltip');
-  const name = d.properties?.name || 'Unknown';
-  const c = COUNTRIES.find(x=>x.name===name);
-  document.getElementById('tt-name').innerHTML = (c?.flag||'🌐')+' '+name;
-  document.getElementById('tt-attacks').textContent = fmt(sourceCounts[name]||Math.floor(Math.random()*50000));
-  document.getElementById('tt-type').textContent = c?.topType || 'DDoS';
-  tt.style.display='block';
-  moveTooltip(event);
-}
-function moveTooltip(event){
-  const tt = document.getElementById('mapTooltip');
-  const wrap = document.getElementById('mapWrap');
-  const rect = wrap.getBoundingClientRect();
-  let x = event.clientX - rect.left + 14;
-  let y = event.clientY - rect.top - 10;
-  if(x + 180 > rect.width) x -= 200;
-  tt.style.left = x+'px';
-  tt.style.top = y+'px';
-}
-function hideTooltip(){
-  document.getElementById('mapTooltip').style.display='none';
+// ── COUNTRY POPUP ────────────────────────────────────────
+function showCountryPopup(event, d) {
+  const rawName = d.properties?.name || 'Unknown';
+  const name = normalizeName(rawName);
+  const src = SOURCES.find(s => s.name === name);
+  const tgt = TARGETS.find(t => t.name === name);
+  const role = getCountryRole(name);
+  const count = srcCounts[name] || Math.floor(Math.random()*30000+5000);
+  const liveVal = liveCounts[name] || Math.floor(Math.random()*80+10);
+
+  const badge = document.getElementById('cpop-badge');
+  const colors = {source:'#ff2d4a',target:'#00ff96',both:'#ffd60a',neutral:'#6b7280'};
+  const labels = {source:'ATTACKER',target:'TARGET',both:'BOTH',neutral:'NEUTRAL'};
+  badge.textContent = labels[role];
+  badge.style.background = colors[role]+'22';
+  badge.style.color = colors[role];
+  badge.style.border = `1px solid ${colors[role]}44`;
+
+  document.getElementById('cpop-flag').textContent = src?.flag || tgt?.flag || '🌐';
+  document.getElementById('cpop-name').textContent = name;
+  document.getElementById('cpop-total').textContent = fmt(count);
+  document.getElementById('cpop-type').textContent = src?.type || 'Phishing';
+  document.getElementById('cpop-threat').textContent = SEVS[Math.min(3,Math.floor(count/40000))].l;
+  document.getElementById('cpop-status').textContent = role === 'neutral' ? 'MONITORING' : 'ACTIVE';
+  document.getElementById('cpop-status').style.color = role === 'neutral' ? '#00b8ff' : '#ff2d4a';
+  document.getElementById('cpop-live-val').textContent = liveVal + '/min';
+
+  // Position popup near click but keep on screen
+  const cpop = document.getElementById('cpop');
+  cpop.classList.add('show');
+  const px = event.clientX, py = event.clientY;
+  const pw = 260, ph = 220;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  cpop.style.left = Math.min(px+10, vw-pw-10) + 'px';
+  cpop.style.top  = Math.min(py-20, vh-ph-60) + 'px';
+
+  selectedCountry = name;
+
+  // Live update for the popup
+  if (window._popupInterval) clearInterval(window._popupInterval);
+  window._popupInterval = setInterval(() => {
+    if (!document.getElementById('cpop').classList.contains('show')) {
+      clearInterval(window._popupInterval); return;
+    }
+    const current = srcCounts[name] || 0;
+    document.getElementById('cpop-total').textContent = fmt(current);
+    const lv = (liveCounts[name] || 0) + Math.floor(Math.random()*5);
+    liveCounts[name] = lv;
+    document.getElementById('cpop-live-val').textContent = lv + '/min';
+  }, 1200);
 }
 
-// Zoom to country
-function zoomToCountry(d){
-  const [[x0,y0],[x1,y1]] = path.bounds(d);
-  const cx = (x0+x1)/2, cy = (y0+y1)/2;
-  const scale = Math.min(8, 0.9/Math.max((x1-x0)/W,(y1-y0)/H));
-  svg.transition().duration(750).call(
-    zoom.transform,
-    d3.zoomIdentity.translate(W/2,H/2).scale(scale).translate(-cx,-cy)
-  );
-  // Show country panel
-  const name = d.properties?.name || '';
-  showCountryByName(name);
-}
-
-// Zoom buttons
-document.getElementById('zoomIn').addEventListener('click',()=>{
-  svg.transition().duration(300).call(zoom.scaleBy, 1.5);
-});
-document.getElementById('zoomOut').addEventListener('click',()=>{
-  svg.transition().duration(300).call(zoom.scaleBy, 0.67);
-});
-document.getElementById('zoomReset').addEventListener('click',()=>{
-  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
-});
-
-// Search
-function setupSearch(features){
+// ── SEARCH ───────────────────────────────────────────────
+function setupSearch(features) {
   const input = document.getElementById('searchInput');
-  const results = document.getElementById('searchResults');
+  const dropdown = document.getElementById('searchDropdown');
+  const clearBtn = document.getElementById('searchClear');
 
-  input.addEventListener('input', ()=>{
-    const q = input.value.toLowerCase().trim();
-    if(!q){ results.style.display='none'; return; }
-    const matches = features
-      .filter(f=>(f.properties?.name||'').toLowerCase().includes(q))
-      .slice(0,6);
-    if(!matches.length){ results.style.display='none'; return; }
-    results.style.display='block';
-    results.innerHTML = matches.map(f=>{
-      const name = f.properties?.name||'';
-      const c = COUNTRIES.find(x=>x.name===name);
-      return `<div class="sr-item" onclick="selectCountry('${name.replace(/'/g,"\'")}')">
-        <span>${c?.flag||'🌐'}</span>
-        <span>${name}</span>
-        <span style="margin-left:auto;font-size:0.65rem;color:var(--muted)">${fmt(sourceCounts[name]||0)} attacks</span>
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    clearBtn.classList.toggle('show', q.length > 0);
+    if (!q) { dropdown.classList.remove('show'); return; }
+
+    const matches = ALL_COUNTRIES
+      .filter(c => c.name.toLowerCase().includes(q))
+      .slice(0, 7);
+
+    if (!matches.length) {
+      dropdown.innerHTML = '<div class="s-empty">No countries found</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+
+    dropdown.innerHTML = matches.map(c => {
+      const role = getCountryRole(c.name);
+      const roleColors = {source:'#ff2d4a',target:'#00ff96',both:'#ffd60a',neutral:'#6b7280'};
+      const roleLabels = {source:'SRC',target:'TGT',both:'BOTH',neutral:'—'};
+      return `<div class="s-item" onclick="selectAndZoom('${c.name.replace(/'/g,"\\'")}')">
+        <span class="s-flag">${c.flag||'🌐'}</span>
+        <span class="s-name">${c.name}</span>
+        <span class="s-count">${fmt(srcCounts[c.name]||0)}</span>
+        <span class="s-type" style="background:${roleColors[role]}22;color:${roleColors[role]}">${roleLabels[role]}</span>
       </div>`;
     }).join('');
+    dropdown.classList.add('show');
   });
 
-  input.addEventListener('keydown', e=>{
-    if(e.key==='Escape'){ results.style.display='none'; input.value=''; }
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    dropdown.classList.remove('show');
+    clearBtn.classList.remove('show');
+    input.focus();
   });
 
-  document.addEventListener('click', e=>{
-    if(!document.getElementById('mapSearch').contains(e.target)){
-      results.style.display='none';
+  document.addEventListener('click', e => {
+    if (!document.querySelector('.search-wrap').contains(e.target)) {
+      dropdown.classList.remove('show');
+    }
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      input.value = ''; dropdown.classList.remove('show'); clearBtn.classList.remove('show');
     }
   });
 }
 
-function selectCountry(name){
+function selectAndZoom(name) {
   document.getElementById('searchInput').value = name;
-  document.getElementById('searchResults').style.display='none';
-  // Find feature and zoom
-  if(!window._world) return;
+  document.getElementById('searchDropdown').classList.remove('show');
+  document.getElementById('searchClear').classList.add('show');
+
+  if (!window._world) return;
   const features = topojson.feature(window._world, window._world.objects.countries).features;
-  const f = features.find(x=>(x.properties?.name||'')===name);
-  if(f) zoomToCountry(f);
-  showCountryByName(name);
+  const f = features.find(x => (x.properties?.name||'') === name);
+  if (!f) return;
+
+  const [[x0,y0],[x1,y1]] = pathGen.bounds(f);
+  const cx = (x0+x1)/2, cy = (y0+y1)/2;
+  const scale = Math.min(6, 0.85/Math.max((x1-x0)/W,(y1-y0)/H));
+  svg.transition().duration(700).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(W/2,H/2).scale(scale).translate(-cx,-cy)
+  );
+
+  // Show popup for searched country
+  const c = ALL_COUNTRIES.find(x => x.name === name);
+  if (c) {
+    const fakeEvent = { clientX: W/2, clientY: H/3 };
+    showCountryPopup(fakeEvent, f);
+  }
 }
 
-window.addEventListener('resize',resize);
+// ── ZOOM ─────────────────────────────────────────────────
+document.getElementById('zIn').onclick = () => svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+document.getElementById('zOut').onclick = () => svg.transition().duration(300).call(zoom.scaleBy, 0.67);
+document.getElementById('zReset').onclick = () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
 
-// ── LOAD MAP ─────────────────────────────────
-fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
-  .then(r=>r.json()).then(data=>{
-    window._world=data;
-    resize();
-    startSim();
-  });
-
-function project(lat,lon){
-  if(!projection) return null;
-  return projection([lon,lat]);
-}
-
-// ── WEIGHTED RANDOM ──────────────────────────
-function wRand(arr){
-  const t=arr.reduce((s,x)=>s+x.weight,0);
-  let r=Math.random()*t;
-  for(const x of arr){r-=x.weight;if(r<=0)return x;}
-  return arr[arr.length-1];
-}
-
-// ── FORMAT ───────────────────────────────────
-function fmt(n){
-  if(n>=1000000)return(n/1e6).toFixed(1)+'M';
-  if(n>=1000)return(n/1000).toFixed(1)+'K';
+// ── HELPERS ───────────────────────────────────────────────
+function fmt(n) {
+  if (n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if (n>=1000) return (n/1000).toFixed(1)+'K';
   return n.toString();
 }
-
-// ── CREATE ATTACK ────────────────────────────
-function createAttack(){
-  const src=wRand(COUNTRIES);
-  let tgt=TARGETS[Math.floor(Math.random()*TARGETS.length)];
-  let tries=0;
-  while(tgt.name===src.name&&tries<5){tgt=TARGETS[Math.floor(Math.random()*TARGETS.length)];tries++;}
-  const type=wRand(ATTACK_TYPES);
-  const sp=project(src.lat,src.lon);
-  const tp=project(tgt.lat,tgt.lon);
-  if(!sp||!tp) return;
-
-  arcs.push({
-    sx:sp[0],sy:sp[1],tx:tp[0],ty:tp[1],
-    progress:0,speed:0.007+Math.random()*0.013,
-    color:type.color,width:0.8+Math.random()*0.8,done:false
-  });
-
-  totalToday++;
-  if(Math.random()<0.73) blockedToday++;
-  typeCounts[type.name]=(typeCounts[type.name]||0)+1;
-  sourceCounts[src.name]=(sourceCounts[src.name]||0)+1;
-  apsCounter++;
-
-  addFeed(src,tgt,type);
-  updateTypeCounters(type);
-
-  // Critical alert — ransomware or every ~40 attacks
-  const now=Date.now();
-  if((type.name==='Ransomware'||Math.random()<0.025)&&!alertCooldown&&now-lastAlertTime>35000){
-    triggerAlert(src,tgt,type);
-  }
-
-  // Update severity
-  updateSeverity();
+function wRand(arr) {
+  const t = arr.reduce((s,x)=>s+x.w,0);
+  let r = Math.random()*t;
+  for (const x of arr) { r-=x.w; if(r<=0) return x; }
+  return arr[arr.length-1];
+}
+function proj2(lat,lon) {
+  if (!proj) return null;
+  return proj([lon,lat]);
 }
 
-// ── ALERT ────────────────────────────────────
-function triggerAlert(src,tgt,type){
-  alertCooldown=true;
-  lastAlertTime=Date.now();
-  document.getElementById('alertType').textContent=`${type.icon} ${type.name.toUpperCase()} ATTACK DETECTED`;
-  document.getElementById('alertRoute').textContent=`${src.flag} ${src.name} → ${tgt.flag} ${tgt.name}`;
-  document.getElementById('alertOverlay').classList.add('show');
-  setTimeout(()=>{
-    closeAlert();
-    alertCooldown=false;
-  },6000);
-}
-function closeAlert(){
-  document.getElementById('alertOverlay').classList.remove('show');
-}
-
-// ── SEVERITY GAUGE ───────────────────────────
-const SEVERITY_LEVELS=[
-  {label:'LOW',color:'#00b8ff',bars:1},
-  {label:'MEDIUM',color:'#ffd60a',bars:2},
-  {label:'HIGH',color:'#ff6b2b',bars:3},
-  {label:'CRITICAL',color:'#ff2d4a',bars:4},
-];
-const SEGS=['#00b8ff','#ffd60a','#ff6b2b','#ff2d4a'];
-
-function updateSeverity(){
-  // Fluctuate severity
-  if(Math.random()<0.02){
-    severityLevel=Math.min(3,Math.max(0,severityLevel+(Math.random()>0.5?1:-1)));
-  }
-  const sl=SEVERITY_LEVELS[severityLevel];
-  const gaugeBar=document.getElementById('gaugeBar');
-  gaugeBar.innerHTML=SEGS.map((c,i)=>`<div class="gauge-seg" style="background:${i<sl.bars?c:'rgba(255,255,255,0.06)'}"></div>`).join('');
-  document.getElementById('gaugeCurrent').textContent=sl.label;
-  document.getElementById('gaugeCurrent').style.color=sl.color;
-
-  // Threat badge
-  const badge=document.getElementById('threatBadge');
-  const icons=['🟢','🟡','🟠','🔴'];
-  badge.textContent=`${icons[severityLevel]} ${sl.label}`;
-  badge.style.color=sl.color;
-  badge.style.borderColor=sl.color+'44';
-  badge.style.background=sl.color+'12';
-}
-
-// ── TYPE COUNTERS ────────────────────────────
-function updateTypeCounters(type){
-  const map={'DDoS':'ddos','Brute Force':'brute','Ransomware':'ransom','Phishing':'phish','Port Scan':'scan','Malware':'scan'};
-  const key=map[type.name];
-  ['b','ms'].forEach(prefix=>{
-    const el=document.getElementById(`${prefix}-${key}`);
-    if(el) el.textContent=fmt(typeCounts[type.name]);
-  });
-}
-
-// ── FEED ─────────────────────────────────────
-function addFeed(src,tgt,type){
-  const feed=document.getElementById('feed');
-  const ts=new Date().toTimeString().slice(0,8);
-  const div=document.createElement('div');
-  div.className='feed-item';
-  div.style.borderLeftColor=type.color;
-  div.innerHTML=`
-    <div class="feed-top">
-      <span class="feed-type ${type.cls}">${type.icon} ${type.name}</span>
-      <span class="feed-time">${ts}</span>
-    </div>
-    <div class="feed-route">${src.flag} <span>${src.name}</span> → ${tgt.flag} <span>${tgt.name}</span></div>
-    <div class="feed-severity" style="color:${SEVERITY_COLORS[type.severity]||'#fff'}">${type.severity}</div>
-  `;
-  feed.insertBefore(div,feed.firstChild);
-  if(feed.children.length>50) feed.removeChild(feed.lastChild);
-}
-
-// ── TYPE GRID ─────────────────────────────────
-function updateTypeGrid(){
-  const grid=document.getElementById('typeGrid');
-  const total=Object.values(typeCounts).reduce((s,v)=>s+v,0);
-  grid.innerHTML=ATTACK_TYPES.map(t=>{
-    const count=typeCounts[t.name]||0;
-    const pct=total>0?(count/total*100).toFixed(0):0;
-    return`<div class="type-row">
-      <div class="type-dot" style="background:${t.color}"></div>
-      <span class="type-name">${t.name}</span>
-      <div class="type-bar-wrap"><div class="type-bar" style="width:${pct}%;background:${t.color}"></div></div>
-      <span class="type-count">${fmt(count)}</span>
-    </div>`;
-  }).join('');
-}
-
-// ── SOURCE LIST ───────────────────────────────
-function updateSourceList(){
-  const list=document.getElementById('sourceList');
-  const sorted=Object.entries(sourceCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const max=sorted[0]?.[1]||1;
-  list.innerHTML=sorted.map(([name,count],i)=>{
-    const c=COUNTRIES.find(x=>x.name===name);
-    const pct=Math.round(count/max*100);
-    return`<div class="country-row" onclick="showCountryByName('${name}')">
-      <span class="country-rank">${i+1}</span>
-      <span class="country-flag">${c?.flag||'🌐'}</span>
-      <span class="country-name">${name}</span>
-      <div class="country-bar-wrap"><div class="country-bar" style="width:${pct}%"></div></div>
-      <span class="country-count">${fmt(count)}</span>
-    </div>`;
-  }).join('');
-}
-
-// ── COUNTRY PANEL ─────────────────────────────
-function showCountryByName(name){
-  const c=COUNTRIES.find(x=>x.name===name);
-  if(!c) return;
-  document.getElementById('cp-flag').textContent=c.flag;
-  document.getElementById('cp-name').textContent=c.name;
-  document.getElementById('cp-total').textContent=fmt(sourceCounts[c.name]||0);
-  document.getElementById('cp-type').textContent=c.topType;
-  document.getElementById('cp-time').textContent=new Date().toTimeString().slice(0,8);
-  document.getElementById('cp-threat').textContent=SEVERITY_LEVELS[Math.floor(Math.random()*4)].label;
-  document.getElementById('countryPanel').classList.add('show');
-}
-function showCountryInfo(event,d){ /* SVG click - future enhancement */ }
-function closeCountryPanel(){document.getElementById('countryPanel').classList.remove('show');}
-
-// ── DRAW ─────────────────────────────────────
-function draw(){
+// ── DRAW LOOP ────────────────────────────────────────────
+function draw() {
   ctx.clearRect(0,0,W,H);
 
   // Arcs
-  arcs=arcs.filter(a=>{
-    a.progress+=a.speed;
-    const cx=(a.sx+a.tx)/2;
-    const cy=(a.sy+a.ty)/2-Math.abs(a.tx-a.sx)*0.32-30;
-    const t=Math.min(a.progress,1);
-    const steps=40;
-
+  arcs = arcs.filter(a => {
+    a.progress += a.speed;
+    const cx=(a.sx+a.tx)/2, cy=(a.sy+a.ty)/2 - Math.abs(a.tx-a.sx)*0.32 - 30;
+    const t = Math.min(a.progress, 1);
+    const steps = 40;
     ctx.save();
-    ctx.globalAlpha=Math.min(1,(1-a.progress)*2);
-    ctx.shadowBlur=14;ctx.shadowColor=a.color;
-    ctx.strokeStyle=a.color;ctx.lineWidth=a.width;ctx.lineCap='round';
+    ctx.globalAlpha = Math.min(1,(1-a.progress)*2.2);
+    ctx.shadowBlur = 14; ctx.shadowColor = a.color;
+    ctx.strokeStyle = a.color; ctx.lineWidth = a.w; ctx.lineCap = 'round';
     ctx.beginPath();
-    for(let i=0;i<=steps;i++){
+    for (let i=0;i<=steps;i++) {
       const ti=(i/steps)*t;
       const x=(1-ti)*(1-ti)*a.sx+2*(1-ti)*ti*cx+ti*ti*a.tx;
       const y=(1-ti)*(1-ti)*a.sy+2*(1-ti)*ti*cy+ti*ti*a.ty;
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     }
     ctx.stroke();
-
-    // Tip dot
     const px=(1-t)*(1-t)*a.sx+2*(1-t)*t*cx+t*t*a.tx;
     const py=(1-t)*(1-t)*a.sy+2*(1-t)*t*cy+t*t*a.ty;
-    ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fillStyle=a.color;ctx.fill();
+    ctx.beginPath(); ctx.arc(px,py,2.5,0,Math.PI*2);
+    ctx.fillStyle=a.color; ctx.fill();
     ctx.restore();
-
-    if(a.progress>=1){
-      pulses.push({x:a.tx,y:a.ty,r:0,maxR:32,color:a.color,speed:1.4});
-      pulses.push({x:a.tx,y:a.ty,r:0,maxR:18,color:a.color,speed:2.2});
+    if (a.progress>=1) {
+      pulses.push({x:a.tx,y:a.ty,r:0,maxR:30,color:a.color,speed:1.4});
+      pulses.push({x:a.tx,y:a.ty,r:0,maxR:16,color:a.color,speed:2.2});
       return false;
     }
     return true;
   });
 
   // Pulses
-  pulses=pulses.filter(p=>{
-    p.r+=p.speed;
-    const alpha=0.85*(1-p.r/p.maxR);
+  pulses = pulses.filter(p => {
+    p.r += p.speed;
     ctx.save();
-    ctx.globalAlpha=alpha;
-    ctx.shadowBlur=8;ctx.shadowColor=p.color;
-    ctx.strokeStyle=p.color;ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.stroke();
+    ctx.globalAlpha = 0.85*(1-p.r/p.maxR);
+    ctx.shadowBlur=8; ctx.shadowColor=p.color;
+    ctx.strokeStyle=p.color; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.stroke();
     ctx.restore();
-    return p.r<p.maxR;
+    return p.r < p.maxR;
   });
 
-  // Origin dots — top attacker countries
-  COUNTRIES.slice(0,12).forEach(c=>{
-    const p=project(c.lat,c.lon);
-    if(!p) return;
-    const count=sourceCounts[c.name]||0;
-    const size=Math.min(4,1.5+count/80000);
+  // Origin glow dots
+  SOURCES.slice(0,12).forEach(s => {
+    const p = proj2(s.lat,s.lon); if(!p) return;
     ctx.save();
-    ctx.globalAlpha=0.6;
-    ctx.shadowBlur=10;ctx.shadowColor='#ff2d4a';
+    ctx.globalAlpha=0.7; ctx.shadowBlur=10; ctx.shadowColor='#ff2d4a';
     ctx.fillStyle='#ff2d4a';
-    ctx.beginPath();ctx.arc(p[0],p[1],size,0,Math.PI*2);ctx.fill();
-    ctx.restore();
-  });
-
-  // Target dots
-  TARGETS.slice(0,6).forEach(c=>{
-    const p=project(c.lat,c.lon);
-    if(!p) return;
-    ctx.save();
-    ctx.globalAlpha=0.3;
-    ctx.shadowBlur=6;ctx.shadowColor='#00ff96';
-    ctx.fillStyle='#00ff96';
-    ctx.beginPath();ctx.arc(p[0],p[1],2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath(); ctx.arc(p[0],p[1],2.5,0,Math.PI*2); ctx.fill();
     ctx.restore();
   });
 
   requestAnimationFrame(draw);
 }
 
-// ── TICKER ────────────────────────────────────
-function buildTicker(){
+// ── ATTACK GENERATOR ─────────────────────────────────────
+function attack() {
+  const src = wRand(SOURCES);
+  let tgt = TARGETS[Math.floor(Math.random()*TARGETS.length)];
+  let tries=0;
+  while(tgt.name===src.name && tries<5){tgt=TARGETS[Math.floor(Math.random()*TARGETS.length)];tries++;}
+  const type = wRand(TYPES);
+  const sp = proj2(src.lat,src.lon);
+  const tp = proj2(tgt.lat,tgt.lon);
+  if (!sp||!tp) return;
+
+  arcs.push({sx:sp[0],sy:sp[1],tx:tp[0],ty:tp[1],progress:0,speed:0.007+Math.random()*0.013,color:type.color,w:0.8+Math.random()*0.8});
+  total++; if(Math.random()<0.73) blocked++;
+  typeCounts[type.name]=(typeCounts[type.name]||0)+1;
+  srcCounts[src.name]=(srcCounts[src.name]||0)+1;
+  liveCounts[src.name]=(liveCounts[src.name]||0)+1;
+  apsCount++;
+
+  addFeed(src,tgt,type);
+  updateTypeCounters(type);
+
+  const now=Date.now();
+  if((type.name==='Ransomware'||Math.random()<0.022)&&!alertCooldown&&now-lastAlert>35000) {
+    alertCooldown=true; lastAlert=now;
+    document.getElementById('alertType').textContent=`${type.icon} ${type.name.toUpperCase()} DETECTED`;
+    document.getElementById('alertRoute').textContent=`${src.flag} ${src.name} → ${tgt.flag} ${tgt.name}`;
+    document.getElementById('alertOverlay').classList.add('show');
+    setTimeout(()=>{document.getElementById('alertOverlay').classList.remove('show');alertCooldown=false;},6000);
+  }
+  updateGauge();
+  setTimeout(attack, 180+Math.random()*550);
+}
+
+// ── UI UPDATES ────────────────────────────────────────────
+function addFeed(src,tgt,type) {
+  const feed=document.getElementById('feed');
+  const ts=new Date().toTimeString().slice(0,8);
+  const div=document.createElement('div');
+  div.className='feed-item';
+  div.style.borderLeftColor=type.color;
+  div.innerHTML=`<div class="feed-top"><span class="feed-type ${type.cls}">${type.icon} ${type.name}</span><span class="feed-time">${ts}</span></div>
+    <div class="feed-route">${src.flag} <b>${src.name}</b> → ${tgt.flag} <b>${tgt.name}</b></div>
+    <div class="feed-sev" style="color:${type.color}">${type.sev}</div>`;
+  feed.insertBefore(div,feed.firstChild);
+  if(feed.children.length>50) feed.removeChild(feed.lastChild);
+}
+
+function updateTypeCounters(type) {
+  const map={'DDoS':'b-ddos','Brute Force':'b-brute','Ransomware':'b-ransom','Phishing':'b-phish','Port Scan':'b-scan','Malware':'b-scan'};
+  const el=document.getElementById(map[type.name]);
+  if(el) el.textContent=fmt(typeCounts[type.name]);
+}
+
+function updateTypeGrid() {
+  const total=Object.values(typeCounts).reduce((s,v)=>s+v,0);
+  document.getElementById('typeGrid').innerHTML=TYPES.map(t=>{
+    const count=typeCounts[t.name]||0;
+    const pct=total>0?(count/total*100).toFixed(0):0;
+    return`<div class="type-row"><div class="tdot" style="background:${t.color}"></div>
+      <span class="tname">${t.name}</span>
+      <div class="tbar-wrap"><div class="tbar" style="width:${pct}%;background:${t.color}"></div></div>
+      <span class="tcount">${fmt(count)}</span></div>`;
+  }).join('');
+}
+
+function updateSrcList() {
+  const sorted=Object.entries(srcCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const max=sorted[0]?.[1]||1;
+  document.getElementById('srcList').innerHTML=sorted.map(([name,count],i)=>{
+    const c=SOURCES.find(x=>x.name===name);
+    return`<div class="c-row" onclick="selectAndZoom('${name.replace(/'/g,"\\'")}')">
+      <span class="c-rank">${i+1}</span>
+      <span class="c-flag">${c?.flag||'🌐'}</span>
+      <span class="c-name">${name}</span>
+      <div class="c-bar-wrap"><div class="c-bar" style="width:${Math.round(count/max*100)}%"></div></div>
+      <span class="c-count">${fmt(count)}</span></div>`;
+  }).join('');
+}
+
+function updateGauge() {
+  if(Math.random()<0.015) sevIdx=Math.min(3,Math.max(0,sevIdx+(Math.random()>0.5?1:-1)));
+  const sv=SEVS[sevIdx];
+  document.getElementById('gaugeSegs').innerHTML=SEG_COLORS.map((c,i)=>
+    `<div class="gseg" style="background:${i<=sevIdx?c:'rgba(255,255,255,0.06)'}"></div>`).join('');
+  const gv=document.getElementById('gaugeVal');
+  gv.textContent=sv.l; gv.style.color=sv.c;
+  const badge=document.getElementById('threatBadge');
+  const icons=['🟢','🟡','🟠','🔴'];
+  badge.textContent=`${icons[sevIdx]} ${sv.l}`;
+  badge.style.color=sv.c; badge.style.borderColor=sv.c+'44'; badge.style.background=sv.c+'12';
+}
+
+function buildTicker() {
   const track=document.getElementById('ticker');
   const items=[
-    ...ATTACK_TYPES.map(t=>`<div class="tick-item"><div class="tick-dot" style="background:${t.color}"></div><span style="color:${t.color}">${t.icon} ${t.name} activity detected</span></div>`),
-    ...COUNTRIES.slice(0,8).map(c=>`<div class="tick-item"><span>${c.flag} ${c.name} — ${c.topType} source active</span></div>`),
-    `<div class="tick-item"><span style="color:var(--green)">🛡️ CyberWatch monitoring 20 countries · rahuldev7-web.github.io</span></div>`,
+    ...TYPES.map(t=>`<div class="tick"><span style="color:${t.color}">${t.icon} ${t.name}</span></div>`),
+    ...SOURCES.slice(0,6).map(s=>`<div class="tick">${s.flag} ${s.name} — active threat source</div>`),
+    `<div class="tick" style="color:var(--green)">🛡️ Built by Kiran Rahul Pabboju · M.S. Cybersecurity</div>`,
   ];
   track.innerHTML=[...items,...items].join('');
 }
 
-// ── SIMULATION ────────────────────────────────
-function startSim(){
-  draw();
-  buildTicker();
-  updateTypeGrid();
-  updateSourceList();
-  updateSeverity();
+// ── STATS LOOP ────────────────────────────────────────────
+setInterval(() => {
+  aps=apsCount; apsCount=0;
+  document.getElementById('n-aps').textContent=aps;
+  document.getElementById('n-total').textContent=fmt(total);
+  document.getElementById('n-blocked').textContent=fmt(blocked);
+  updateSrcList(); updateTypeGrid();
+  total+=Math.floor(Math.random()*60)+20;
+  blocked+=Math.floor(Math.random()*44)+14;
+  TYPES.forEach(t=>{typeCounts[t.name]+=Math.floor(Math.random()*25*t.w/10);});
+  SOURCES.forEach(s=>{srcCounts[s.name]+=Math.floor(Math.random()*s.w*2);});
+},1000);
 
-  // Initial gauge build
-  document.getElementById('gaugeBar').innerHTML=SEGS.map((c,i)=>`<div class="gauge-seg" style="background:${i<2?c:'rgba(255,255,255,0.06)'}"></div>`).join('');
-
-  // Attack loop
-  function scheduleAttack(){
-    createAttack();
-    setTimeout(scheduleAttack,180+Math.random()*550);
-  }
-  scheduleAttack();
-
-  // Stats update loop
-  setInterval(()=>{
-    attacksPerSec=apsCounter; apsCounter=0;
-    document.getElementById('nav-aps').textContent=attacksPerSec;
-    document.getElementById('nav-total').textContent=fmt(totalToday);
-    document.getElementById('nav-blocked').textContent=fmt(blockedToday);
-    updateSourceList();
-    updateTypeGrid();
-
-    // Background growth
-    totalToday+=Math.floor(Math.random()*60)+20;
-    blockedToday+=Math.floor(Math.random()*44)+14;
-    ATTACK_TYPES.forEach(t=>{typeCounts[t.name]+=Math.floor(Math.random()*25*t.weight/10);});
-    COUNTRIES.slice(0,10).forEach(c=>{sourceCounts[c.name]+=Math.floor(Math.random()*c.weight*2);});
-  },1000);
-}
+// ── INIT ─────────────────────────────────────────────────
+window.addEventListener('resize', resize);
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+  .then(r=>r.json()).then(data=>{
+    window._world=data;
+    resize(); draw(); buildTicker(); updateTypeGrid(); updateSrcList(); updateGauge();
+    setTimeout(attack, 500);
+  });
 </script>
 </body>
 </html>
